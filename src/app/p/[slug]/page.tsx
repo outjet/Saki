@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getAllPropertySlugs, getPropertyBySlug } from "@/lib/content";
+import { getPropertyBySlug } from "@/lib/content";
 import { formatAddressLine, formatOpenHouse } from "@/lib/format";
 import { HeroKenBurns } from "@/components/hero-kenburns";
 import { StickyNav, type StickyNavItem } from "@/components/sticky-nav";
@@ -14,10 +14,7 @@ import { InquiryForm } from "@/components/inquiry-form";
 import { GoogleMap } from "@/components/google-map";
 import { DetailsBar } from "@/components/details-bar";
 
-export async function generateStaticParams() {
-  const slugs = await getAllPropertySlugs();
-  return slugs.map((slug) => ({ slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params

@@ -73,7 +73,17 @@ export async function getPropertyFromFirestore(
 ): Promise<Property | null> {
   if (!isServerFirebaseAvailable()) return null;
 
-  const snap = await adminDb().doc(`properties/${slug}`).get();
+  let snap: FirebaseFirestore.DocumentSnapshot;
+  try {
+    snap = await adminDb().doc(`properties/${slug}`).get();
+  } catch (e) {
+    console.warn("[property-store] Firestore read failed", {
+      slug,
+      message: e instanceof Error ? e.message : String(e)
+    });
+    return null;
+  }
+
   if (!snap.exists) return null;
 
   const data = snap.data() as Omit<Property, "slug">;
@@ -105,7 +115,13 @@ export async function getPropertyFromFirestore(
 
 export async function listPropertySlugsFromFirestore(): Promise<string[] | null> {
   if (!isServerFirebaseAvailable()) return null;
-  const snap = await adminDb().collection("properties").get();
-  return snap.docs.map((d) => d.id).sort(byName);
+  try {
+    const snap = await adminDb().collection("properties").get();
+    return snap.docs.map((d) => d.id).sort(byName);
+  } catch (e) {
+    console.warn("[property-store] Firestore list failed", {
+      message: e instanceof Error ? e.message : String(e)
+    });
+    return null;
+  }
 }
-

@@ -88,8 +88,12 @@ async function loadProperty(slug: string): Promise<Property> {
 }
 
 export async function getAllPropertySlugs() {
-  const fromFs = await listPropertySlugsFromFirestore();
-  if (fromFs && fromFs.length > 0) return fromFs;
+  try {
+    const fromFs = await listPropertySlugsFromFirestore();
+    if (fromFs && fromFs.length > 0) return fromFs;
+  } catch {
+    // ignore and fall back to local content
+  }
 
   if (!(await fileExists(CONTENT_ROOT))) return [];
   const entries = await fs.readdir(CONTENT_ROOT, { withFileTypes: true });
@@ -113,8 +117,12 @@ export async function getAllProperties(): Promise<PropertyFront[]> {
 }
 
 export async function getPropertyBySlug(slug: string): Promise<Property | null> {
-  const fromFs = await getPropertyFromFirestore(slug);
-  if (fromFs) return fromFs;
+  try {
+    const fromFs = await getPropertyFromFirestore(slug);
+    if (fromFs) return fromFs;
+  } catch {
+    // ignore and fall back to local content
+  }
 
   const jsonPath = path.join(CONTENT_ROOT, slug, "property.json");
   if (!(await fileExists(jsonPath))) return null;

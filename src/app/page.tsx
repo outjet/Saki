@@ -4,6 +4,7 @@ import { formatAddressLine } from "@/lib/format";
 import PropertyPage from "@/app/p/[slug]/page";
 
 const DEDICATED_SLUG = "23760-emmons-road";
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const property = await getPropertyBySlug(DEDICATED_SLUG);
