@@ -17,11 +17,29 @@ This app uses Next.js server routes (for `/owner` and admin APIs), so it must be
 
 1. Firebase Console → **App Hosting** → **Get started**
 2. Connect your GitHub repo and choose a branch (e.g. `main`)
-3. Add environment variables:
-   - `OWNER_EMAIL_ALLOWLIST`
-   - `NEXT_PUBLIC_FIREBASE_*` (client config)
-   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (optional)
+3. Add backend env vars using `apphosting.yaml` + Secret Manager:
+   - This repo includes `apphosting.yaml` (maps env vars to Secret Manager secrets).
+   - Create the secrets in Google Secret Manager with the same names (examples below).
 4. Deploy. App Hosting will build and run Next.js with SSR.
+
+### Creating secrets (CLI)
+
+If you have `gcloud` installed and are logged into the right project:
+
+- Create a secret once:
+  - `gcloud secrets create OWNER_EMAIL_ALLOWLIST --replication-policy=automatic`
+- Add/update a value:
+  - `printf '%s' 'you@gmail.com,teammate@gmail.com' | gcloud secrets versions add OWNER_EMAIL_ALLOWLIST --data-file=-`
+
+Repeat for each secret referenced in `apphosting.yaml` (e.g. `NEXT_PUBLIC_FIREBASE_API_KEY`, etc.).
+
+### Creating secrets (Console)
+
+Google Cloud Console → **Security → Secret Manager**:
+
+1. Create secret (name must match `apphosting.yaml`)
+2. Paste the value
+3. Save
 
 ### Custom domain
 
