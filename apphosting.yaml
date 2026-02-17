@@ -5,7 +5,7 @@ runConfig:
   # minInstances: 0
   # maxInstances: 10
 
-# Environment variables for your backend.
+# Environment variables for your backend
 # Prefer Secret Manager for anything you don't want committed to git.
 env:
   # Owner access control (server-side)
