@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-ink-950 antialiased;
+}
+
+/* Better anchor scrolling with sticky nav */
+[id] {
+  scroll-margin-top: 88px;
+}
+
+.container-page {
+  @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+}
+
+.section-title {
+  @apply text-xl font-semibold tracking-tight text-ink-950;
+}
+
+.section-subtitle {
+  @apply text-sm text-ink-600;
+}
+
+.card {
+  @apply rounded-2xl border border-ink-100 bg-white shadow-soft;
+}
+
+.glass {
+  @apply bg-white/75 backdrop-blur supports-[backdrop-filter]:bg-white/60;
+}
+
+.full-bleed {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+}
+
+/* Ken Burns hero slideshow */
+@keyframes heroFade {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+  }
+  36% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.hero-slide {
+  opacity: 0;
+  animation: heroFade 32s infinite;
+}
+
+.hero-kenburns {
+  animation: kbZoom 14s ease-in-out infinite alternate;
+}
+
+@keyframes kbZoom {
+  0% {
+    transform: scale(1) translateZ(0);
+  }
+  100% {
+    transform: scale(1.12) translateZ(0);
+  }
+}

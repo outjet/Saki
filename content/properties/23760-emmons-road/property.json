@@ -1,0 +1,52 @@
+{
+  "address": {
+    "street": "23760 Emmons Road",
+    "city": "Columbia Station",
+    "state": "OH",
+    "zip": "44028"
+  },
+  "price": { "amount": 650000, "currency": "USD" },
+  "beds": 4,
+  "baths": 3,
+  "homeSqft": 2750,
+  "lot": { "acres": 2.84 },
+  "headline": "Modern comfort with space, privacy, and room to roam.",
+  "description": "Introducing 23760 Emmons Road, a stunning property located in the city of Columbia Station, OH. This exquisite home offers 4 bedrooms and 3 bathrooms, providing ample space for comfortable living. With its generous size of 2,750 square feet and situated on a sizable 2.84 acre lot, this residence offers comfort, privacy, and room to roam.\n\nAs you step inside, you'll notice thoughtful finishes throughout. Gleaming floors create a cozy ambiance that flows seamlessly from room to room, while oversized windows flood the interior with natural light.\n\n(This is demo copy — replace with your real description.)",
+  "features": [
+    "Hardwood floors",
+    "Oversized windows",
+    "Large private lot",
+    "Open concept living",
+    "Updated kitchen",
+    "Generous storage"
+  ],
+  "agent": {
+    "name": "Cacey Example",
+    "phone": "(440) 555-0123",
+    "email": "cacey@example.com",
+    "brokerage": "Saki Realty"
+  },
+  "openHouses": [
+    {
+      "startIso": "2026-02-28T09:45:00-05:00",
+      "note": "Open house"
+    }
+  ],
+  "location": { "lat": 41.2902254, "lon": -81.8927872 },
+  "media": {
+    "photos": [],
+    "floorplans": [],
+    "documents": [
+      { "label": "Brochure", "href": "/listings/23760-emmons-road/docs/brochure.txt" },
+      { "label": "Disclosures", "href": "/listings/23760-emmons-road/docs/disclosures.txt" }
+    ],
+    "video": {
+      "title": "Property video",
+      "embedUrl": ""
+    },
+    "tours": [
+      { "label": "3D Tour (example)", "href": "https://example.com" }
+    ]
+  }
+}
+

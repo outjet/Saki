@@ -1,0 +1,111 @@
+import type { Property } from "@/lib/types";
+import { adminBucket, adminDb } from "@/lib/firebase-admin";
+
+function isServerFirebaseAvailable() {
+  return Boolean(
+    process.env.GOOGLE_CLOUD_PROJECT ||
+      process.env.GCLOUD_PROJECT ||
+      process.env.FIREBASE_CONFIG ||
+      process.env.FIREBASE_PROJECT_ID
+  );
+}
+
+function byName(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+async function listObjectPaths(prefix: string) {
+  const bucket = adminBucket();
+  const [files] = await bucket.getFiles({ prefix });
+  return files
+    .map((f) => f.name)
+    .filter((n) => !n.endsWith("/"))
+    .sort(byName);
+}
+
+async function signedReadUrls(objectPaths: string[], hours = 24) {
+  const bucket = adminBucket();
+  const expires = Date.now() + hours * 60 * 60 * 1000;
+  const urls = await Promise.all(
+    objectPaths.map(async (name) => {
+      const [url] = await bucket.file(name).getSignedUrl({
+        version: "v4",
+        action: "read",
+        expires
+      });
+      return url;
+    })
+  );
+  return urls;
+}
+
+async function autoDiscoverMedia(slug: string) {
+  const base = `listings/${slug}/`;
+  const [heroPaths, photoPaths, floorplanPaths, docPaths] = await Promise.all([
+    listObjectPaths(`${base}hero/`).catch(() => [] as string[]),
+    listObjectPaths(`${base}photos/`).catch(() => [] as string[]),
+    listObjectPaths(`${base}floorplans/`).catch(() => [] as string[]),
+    listObjectPaths(`${base}docs/`).catch(() => [] as string[])
+  ]);
+
+  const [heroUrls, photoUrls, floorUrls, docUrls] = await Promise.all([
+    signedReadUrls(heroPaths),
+    signedReadUrls(photoPaths),
+    signedReadUrls(floorplanPaths),
+    signedReadUrls(docPaths)
+  ]);
+
+  const mergedPhotos = Array.from(new Set([...heroUrls, ...photoUrls]));
+
+  return {
+    hero: heroUrls,
+    photos: mergedPhotos,
+    floorplans: floorUrls,
+    documents: docUrls.map((href, idx) => ({
+      label: docPaths[idx]?.split("/").pop() ?? "Document",
+      href
+    }))
+  };
+}
+
+export async function getPropertyFromFirestore(
+  slug: string
+): Promise<Property | null> {
+  if (!isServerFirebaseAvailable()) return null;
+
+  const snap = await adminDb().doc(`properties/${slug}`).get();
+  if (!snap.exists) return null;
+
+  const data = snap.data() as Omit<Property, "slug">;
+  const base: Property = { ...(data as any), slug };
+
+  const media = base.media ?? {};
+  const needsDiscover =
+    !media.hero?.length ||
+    !media.photos?.length ||
+    !media.floorplans?.length ||
+    !media.documents?.length;
+
+  if (!needsDiscover) return base;
+
+  const discovered = await autoDiscoverMedia(slug).catch(() => null);
+  if (!discovered) return base;
+
+  return {
+    ...base,
+    media: {
+      ...media,
+      hero: media.hero?.length ? media.hero : discovered.hero,
+      photos: media.photos?.length ? media.photos : discovered.photos,
+      floorplans: media.floorplans?.length ? media.floorplans : discovered.floorplans,
+      documents: media.documents?.length ? media.documents : discovered.documents
+    }
+  };
+}
+
+export async function listPropertySlugsFromFirestore(): Promise<string[] | null> {
+  if (!isServerFirebaseAvailable()) return null;
+  const snap = await adminDb().collection("properties").get();
+  return snap.docs.map((d) => d.id).sort(byName);
+}
+
