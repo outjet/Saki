@@ -5,28 +5,12 @@ runConfig:
   # minInstances: 0
   # maxInstances: 10
 
-# Environment variables for your backend
-# Prefer Secret Manager for anything you don't want committed to git.
 env:
-  # Owner access control (server-side)
+  # Public Firebase web config as one JSON string (recommended for App Hosting).
+  # Replace with your actual values from Firebase Console -> Project settings -> Your apps.
+  - variable: FIREBASE_WEB_CONFIG_JSON
+    value: '{"apiKey":"AIzaSyCtJgqfC7xX5ck9Y3WuXd8AdlTNa4Ikm3s","authDomain":"emmons.casa","projectId":"437496174414","storageBucket":"emmonscasa.firebasestorage.app","messagingSenderId":"437496174414","appId":"1:437496174414:web:f9ddf79f97cd7fd454f01f"}'
+
+  # Server-side owner access list.
   - variable: OWNER_EMAIL_ALLOWLIST
-    secret: OWNER_EMAIL_ALLOWLIST
-
-  # Firebase client config (public by design; can be literal values or secrets)
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    secret: NEXT_PUBLIC_FIREBASE_API_KEY
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    secret: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    secret: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    secret: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    secret: NEXT_PUBLIC_FIREBASE_APP_ID
-
-  # Optional: Google Maps JS API key (public in the browser; restrict by HTTP referrer)
-  - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-    secret: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-
+    value: "outjsso@gmail.com,robert.bardwell@gmail.com,carolyn.saki@gmail.com,jsaki00@gmail.com,mrjohnsaki@gmail.com"

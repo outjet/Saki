@@ -3,23 +3,49 @@ import { getAuth } from "firebase/auth";
 
 let app: FirebaseApp | null = null;
 
+type FirebasePublicConfig = {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+};
+
+declare global {
+  interface Window {
+    __FIREBASE_PUBLIC_CONFIG__?: FirebasePublicConfig;
+  }
+}
+
+function runtimeFirebaseConfig(): FirebasePublicConfig {
+  if (typeof window === "undefined") return {};
+  return window.__FIREBASE_PUBLIC_CONFIG__ ?? {};
+}
+
 export function firebaseApp() {
   if (app) return app;
 
-  // Next.js only inlines env vars on the client when they are referenced
-  // explicitly (e.g. `process.env.NEXT_PUBLIC_FOO`), not dynamically
-  // (e.g. `process.env[name]`).
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim();
-  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
-  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() || undefined;
+  const runtime = runtimeFirebaseConfig();
+  const apiKey = runtime.apiKey?.trim() || process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim();
+  const authDomain =
+    runtime.authDomain?.trim() || process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
+  const projectId =
+    runtime.projectId?.trim() || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
+  const storageBucket =
+    runtime.storageBucket?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ||
+    undefined;
   const messagingSenderId =
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim() || undefined;
-  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim() || undefined;
+    runtime.messagingSenderId?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim() ||
+    undefined;
+  const appId =
+    runtime.appId?.trim() || process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim() || undefined;
 
   if (!apiKey || !authDomain || !projectId) {
     throw new Error(
-      "Missing Firebase client env vars. Set NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, and NEXT_PUBLIC_FIREBASE_PROJECT_ID."
+      "Missing Firebase client config. Set FIREBASE_WEB_CONFIG_JSON or NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, and NEXT_PUBLIC_FIREBASE_PROJECT_ID."
     );
   }
 
