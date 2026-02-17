@@ -70,8 +70,8 @@ export default function OwnerPage() {
   >({ status: "signed_out" });
 
   async function ensureSignedIn() {
-    const auth = firebaseAuth();
     try {
+      const auth = firebaseAuth();
       if (!auth.currentUser) {
         setAuthState({ status: "checking" });
         await signInWithPopup(auth, new GoogleAuthProvider());
