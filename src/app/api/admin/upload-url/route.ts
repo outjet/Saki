@@ -70,16 +70,44 @@ export async function POST(req: Request) {
   }
 
   const objectPath = `listings/${slug}/${folder}/${filename}`;
-  const bucket = adminBucket();
-  const file = bucket.file(objectPath);
+  try {
+    const bucket = adminBucket();
+    const file = bucket.file(objectPath);
 
-  const expires = Date.now() + 15 * 60 * 1000;
-  const [signedUrl] = await file.getSignedUrl({
-    version: "v4",
-    action: "write",
-    expires,
-    contentType
-  });
+    const expires = Date.now() + 15 * 60 * 1000;
+    const [signedUrl] = await file.getSignedUrl({
+      version: "v4",
+      action: "write",
+      expires,
+      contentType
+    });
 
-  return NextResponse.json({ ok: true, objectPath, signedUrl });
+    return NextResponse.json({ ok: true, objectPath, signedUrl });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const looksLikeSignBlob =
+      message.includes("signBlob") ||
+      message.includes("iam.serviceAccounts.signBlob") ||
+      message.includes("permission") ||
+      message.includes("serviceAccounts.signBlob");
+
+    const publicMessage = looksLikeSignBlob
+      ? `Failed to sign upload URL. The Cloud Run/App Hosting service account likely needs iam.serviceAccounts.signBlob (roles/iam.serviceAccountTokenCreator on itself). (${message})`
+      : message;
+
+    try {
+      console.error("Admin upload-url failed", {
+        message,
+        error: e,
+        objectPath,
+        uid: decoded?.uid,
+        email,
+        adminConfig: adminConfigStatus()
+      });
+    } catch (logErr) {
+      console.error("Failed to log error detail", logErr);
+    }
+
+    return NextResponse.json({ ok: false, error: publicMessage }, { status: 500 });
+  }
 }

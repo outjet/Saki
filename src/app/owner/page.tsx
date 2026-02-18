@@ -189,9 +189,19 @@ export default function OwnerPage() {
           contentType: file.type || "application/octet-stream"
         })
       });
-      const data = (await res.json()) as { ok?: boolean; signedUrl?: string; error?: string };
-      if (!res.ok || !data.ok || !data.signedUrl) {
-        throw new Error(data.error ?? "Failed to create upload URL");
+      const raw = await res.text();
+      const data = (() => {
+        try {
+          return JSON.parse(raw) as { ok?: boolean; signedUrl?: string; error?: string };
+        } catch {
+          return null;
+        }
+      })();
+      if (!res.ok || !data?.ok || !data.signedUrl) {
+        const details = data?.error || raw?.slice(0, 200) || "";
+        throw new Error(
+          details ? `Failed to create upload URL: ${details}` : "Failed to create upload URL"
+        );
       }
       const put = await fetch(data.signedUrl, {
         method: "PUT",
@@ -580,7 +590,8 @@ function UploadRow({
         accept={accept}
         disabled={status.state === "uploading"}
         onChange={async (e) => {
-          const files = e.target.files;
+          const input = e.currentTarget;
+          const files = input.files;
           if (!files || files.length === 0) return;
 
           setStatus({ state: "picked", count: files.length });
@@ -595,7 +606,7 @@ function UploadRow({
             });
           } finally {
             // Clear so picking the same file again triggers onChange.
-            e.currentTarget.value = "";
+            input.value = "";
           }
         }}
         className="block w-full text-sm text-ink-700 file:mr-3 file:rounded-lg file:border file:border-ink-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink-900 hover:file:bg-ink-50"
