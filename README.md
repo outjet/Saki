@@ -49,6 +49,12 @@ To render the full-width Google Map section, set:
 
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `.env.local`
 
+## Analytics
+
+To enable Google Analytics (GA4), set:
+
+- `NEXT_PUBLIC_GA_MEASUREMENT_ID` (example: `G-XXXXXXXX`)
+
 ## Owner Auth + Live Content (Firebase)
 
 The `/owner` page can save listing content to **Firestore** and upload media to **Firebase Storage**.
@@ -65,6 +71,7 @@ Client (public):
 - `NEXT_PUBLIC_FIREBASE_APP_ID` (optional)
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 - `NEXT_PUBLIC_FORMSPREE_ENDPOINT`
+- `NEXT_PUBLIC_GA_MEASUREMENT_ID`
 - `FIREBASE_WEB_CONFIG_JSON` (recommended on Firebase App Hosting; JSON containing the same fields above)
 
 Server (private):

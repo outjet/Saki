@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
+import { GoogleAnalytics } from "@/components/google-analytics";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -48,6 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const firebasePublicConfig = getFirebasePublicConfig();
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
   const firebaseConfigScript = `window.__FIREBASE_PUBLIC_CONFIG__=${JSON.stringify(
     firebasePublicConfig
   ).replace(/</g, "\\u003c")};`;
@@ -56,6 +58,7 @@ export default function RootLayout({
     <html lang="en" className={montserrat.variable}>
       <body className="font-sans">
         <script dangerouslySetInnerHTML={{ __html: firebaseConfigScript }} />
+        <GoogleAnalytics measurementId={gaMeasurementId} />
         {children}
       </body>
     </html>
