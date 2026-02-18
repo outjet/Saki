@@ -18,20 +18,46 @@ function parseServiceAccount() {
   }
 }
 
+function parseWebConfigProjectId() {
+  const raw = process.env.FIREBASE_WEB_CONFIG_JSON || "";
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw) as { projectId?: string };
+    return parsed.projectId?.trim() || "";
+  } catch {
+    return "";
+  }
+}
+
+function resolveProjectId(serviceAccount: { project_id?: string } | null) {
+  return (
+    serviceAccount?.project_id ||
+    process.env.FIREBASE_PROJECT_ID ||
+    parseWebConfigProjectId() ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    process.env.GCLOUD_PROJECT ||
+    process.env.GCP_PROJECT ||
+    ""
+  );
+}
+
 export function getAdminApp() {
   if (getApps().length === 0) {
     const serviceAccount = parseServiceAccount();
     const storageBucket =
       process.env.FIREBASE_STORAGE_BUCKET ||
       process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    const projectId = resolveProjectId(serviceAccount) || undefined;
 
     if (serviceAccount?.client_email && serviceAccount?.private_key) {
       initializeApp({
         credential: cert(serviceAccount as any),
+        ...(projectId ? { projectId } : {}),
         ...(storageBucket ? { storageBucket } : {})
       });
     } else {
       initializeApp({
+        ...(projectId ? { projectId } : {}),
         ...(storageBucket ? { storageBucket } : {})
       });
     }
@@ -45,13 +71,13 @@ export function adminAuth() {
 }
 
 export function adminDb() {
-  getAdminApp();
-  return getFirestore();
+  const app = getAdminApp();
+  return getFirestore(app);
 }
 
 export function adminBucket() {
-  getAdminApp();
-  const storage = getStorage();
+  const app = getAdminApp();
+  const storage = getStorage(app);
   const bucketName =
     process.env.FIREBASE_STORAGE_BUCKET ||
     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
@@ -65,7 +91,9 @@ export function adminConfigStatus() {
   const hasBucket = Boolean(
     process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
   );
-  return { hasExplicitJson, hasBucket };
+  const serviceAccount = parseServiceAccount();
+  const resolvedProjectId = resolveProjectId(serviceAccount) || null;
+  return { hasExplicitJson, hasBucket, resolvedProjectId };
 }
 
 export function ownerAllowlist() {

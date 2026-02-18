@@ -73,9 +73,22 @@ export async function POST(req: Request) {
       );
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    const code = (e as any)?.code;
+    const status = (e as any)?.status;
+    const looksLikeFirestoreNotFound =
+      code === 5 ||
+      status === "NOT_FOUND" ||
+      message.startsWith("5 NOT_FOUND") ||
+      message.includes("The database (default) does not exist");
+
+    const publicMessage = looksLikeFirestoreNotFound
+      ? `Firestore returned NOT_FOUND. This usually means the server is targeting the wrong GCP project, or Firestore isn't enabled for the target project. (${message})`
+      : message;
     try {
       console.error("Admin property write failed", {
         message,
+        code,
+        status,
         error: e,
         slug,
         uid: decoded?.uid,
@@ -85,7 +98,7 @@ export async function POST(req: Request) {
     } catch (logErr) {
       console.error("Failed to log error detail", logErr);
     }
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: publicMessage }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
