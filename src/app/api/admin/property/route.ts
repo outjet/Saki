@@ -60,16 +60,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Missing slug" }, { status: 400 });
   }
 
-  await adminDb()
-    .doc(`properties/${slug}`)
-    .set(
-      {
-        ...body.property,
-        updatedAt: new Date().toISOString(),
-        updatedBy: { uid: decoded.uid, email }
-      },
-      { merge: true }
-    );
+  try {
+    await adminDb()
+      .doc(`properties/${slug}`)
+      .set(
+        {
+          ...body.property,
+          updatedAt: new Date().toISOString(),
+          updatedBy: { uid: decoded.uid, email }
+        },
+        { merge: true }
+      );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }
