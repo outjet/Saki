@@ -73,6 +73,18 @@ export async function POST(req: Request) {
       );
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    try {
+      console.error("Admin property write failed", {
+        message,
+        error: e,
+        slug,
+        uid: decoded?.uid,
+        email,
+        adminConfig: adminConfigStatus()
+      });
+    } catch (logErr) {
+      console.error("Failed to log error detail", logErr);
+    }
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 
