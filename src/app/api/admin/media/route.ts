@@ -7,7 +7,7 @@ import {
   ownerAllowlist
 } from "@/lib/firebase-admin";
 
-type Folder = "hero" | "photos" | "floorplans" | "docs";
+type Folder = "hero" | "photos" | "floorplans" | "backgrounds" | "docs";
 
 type MediaItem = {
   objectPath: string;
@@ -25,6 +25,8 @@ type UpdatePayload = {
     hero?: string[];
     photos?: string[];
     floorplans?: string[];
+    backgrounds?: string[];
+    overviewBackdrop?: string;
     documents?: { label?: string; href?: string }[];
   };
 };
@@ -187,10 +189,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [heroItems, photoItems, floorplanItems, docItems, snap] = await Promise.all([
+    const [heroItems, photoItems, floorplanItems, backgroundItems, docItems, snap] = await Promise.all([
       listFolderItems(slug, "hero"),
       listFolderItems(slug, "photos"),
       listFolderItems(slug, "floorplans"),
+      listFolderItems(slug, "backgrounds"),
       listFolderItems(slug, "docs"),
       adminDb().doc(`properties/${slug}`).get()
     ]);
@@ -206,6 +209,10 @@ export async function GET(req: Request) {
     const heroOrder = normalizePathList(slug, "hero", media.hero);
     const photoOrder = normalizePathList(slug, "photos", media.photos);
     const floorplanOrder = normalizePathList(slug, "floorplans", media.floorplans);
+    const backgroundOrder = normalizePathList(slug, "backgrounds", [
+      ...(Array.isArray(media.backgrounds) ? media.backgrounds : []),
+      media.overviewBackdrop
+    ]);
     const docOrder = normalizePathList(
       slug,
       "docs",
@@ -224,13 +231,17 @@ export async function GET(req: Request) {
       floorplanItems.map((item) => item.objectPath),
       floorplanOrder
     );
+    const orderedBackgroundPaths = mergeOrdered(
+      backgroundItems.map((item) => item.objectPath),
+      backgroundOrder
+    );
     const orderedDocPaths = mergeOrdered(
       docItems.map((item) => item.objectPath),
       docOrder
     );
 
     const byPath = new Map<string, MediaItem>();
-    for (const item of [...heroItems, ...photoItems, ...floorplanItems, ...docItems]) {
+    for (const item of [...heroItems, ...photoItems, ...floorplanItems, ...backgroundItems, ...docItems]) {
       byPath.set(item.objectPath, item);
     }
 
@@ -249,6 +260,7 @@ export async function GET(req: Request) {
         hero: orderedHeroPaths.map((path) => byPath.get(path)).filter(Boolean),
         photos: orderedPhotoPaths.map((path) => byPath.get(path)).filter(Boolean),
         floorplans: orderedFloorPaths.map((path) => byPath.get(path)).filter(Boolean),
+        backgrounds: orderedBackgroundPaths.map((path) => byPath.get(path)).filter(Boolean),
         docs: orderedDocs
       }
     });
@@ -278,6 +290,7 @@ export async function POST(req: Request) {
     hero: normalizePathList(slug, "hero", body?.media?.hero),
     photos: normalizePathList(slug, "photos", body?.media?.photos),
     floorplans: normalizePathList(slug, "floorplans", body?.media?.floorplans),
+    backgrounds: normalizePathList(slug, "backgrounds", body?.media?.backgrounds),
     documents: normalizeDocuments(slug, body?.media?.documents)
   };
 
@@ -286,7 +299,10 @@ export async function POST(req: Request) {
       .doc(`properties/${slug}`)
       .set(
         {
-          media: nextMedia,
+          media: {
+            ...nextMedia,
+            overviewBackdrop: nextMedia.backgrounds[0] || null
+          },
           updatedAt: new Date().toISOString(),
           updatedBy: { uid: auth.decoded.uid, email: auth.email }
         },
@@ -347,6 +363,13 @@ export async function DELETE(req: Request) {
           (p: string) => p !== objectPath
         )
       );
+      const nextBackgrounds = normalizePathList(
+        slug,
+        "backgrounds",
+        (Array.isArray(media.backgrounds) ? media.backgrounds : []).filter(
+          (p: string) => p !== objectPath
+        )
+      );
       const nextDocuments = normalizeDocuments(
         slug,
         (Array.isArray(media.documents) ? media.documents : []).filter(
@@ -361,6 +384,8 @@ export async function DELETE(req: Request) {
             hero: nextHero,
             photos: nextPhotos,
             floorplans: nextFloorplans,
+            backgrounds: nextBackgrounds,
+            overviewBackdrop: nextBackgrounds[0] || null,
             documents: nextDocuments
           },
           updatedAt: new Date().toISOString(),

@@ -31,7 +31,7 @@ type Draft = {
   lon: string;
 };
 
-type MediaFolder = "hero" | "photos" | "floorplans" | "docs";
+type MediaFolder = "hero" | "photos" | "floorplans" | "backgrounds" | "docs";
 
 type OwnerMediaItem = {
   objectPath: string;
@@ -47,6 +47,7 @@ type OwnerMediaState = {
   hero: OwnerMediaItem[];
   photos: OwnerMediaItem[];
   floorplans: OwnerMediaItem[];
+  backgrounds: OwnerMediaItem[];
   docs: OwnerMediaItem[];
 };
 
@@ -119,6 +120,7 @@ const emptyMediaState: OwnerMediaState = {
   hero: [],
   photos: [],
   floorplans: [],
+  backgrounds: [],
   docs: []
 };
 
@@ -345,6 +347,8 @@ export default function OwnerPage() {
       hero: nextMedia.hero.map((item) => item.objectPath),
       photos: nextMedia.photos.map((item) => item.objectPath),
       floorplans: nextMedia.floorplans.map((item) => item.objectPath),
+      backgrounds: nextMedia.backgrounds.map((item) => item.objectPath),
+      overviewBackdrop: nextMedia.backgrounds[0]?.objectPath || undefined,
       documents: nextMedia.docs.map((item) => ({
         label: item.label?.trim() || item.name,
         href: item.objectPath
@@ -985,6 +989,11 @@ export default function OwnerPage() {
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <UploadRow
+                  label="Upload section background"
+                  hint="Used behind overview and features"
+                  onPick={(files) => uploadFiles("backgrounds", files)}
+                />
+                <UploadRow
                   label="Upload hero"
                   hint="Top slideshow images"
                   onPick={(files) => uploadFiles("hero", files)}
@@ -1008,6 +1017,14 @@ export default function OwnerPage() {
               </div>
 
               <div className="mt-6 grid gap-4">
+                <MediaPanel
+                  title="Section Background"
+                  folder="backgrounds"
+                  items={media.backgrounds}
+                  busy={mediaBusy}
+                  onMove={(index, dir) => void moveMediaItem("backgrounds", index, dir)}
+                  onDelete={(item) => void deleteMediaItem("backgrounds", item)}
+                />
                 <MediaPanel
                   title="Hero"
                   folder="hero"

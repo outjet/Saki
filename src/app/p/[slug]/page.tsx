@@ -50,6 +50,8 @@ export default async function PropertyPage({
   const hasMap = Boolean(property.location);
   const hasGoogleKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
   const overviewBackdrop =
+    property.media?.overviewBackdrop ||
+    property.media?.backgrounds?.[0] ||
     photos.find((src) => /DJI_0868\.png/i.test(src)) ||
     heroImages.find((src) => /DJI_0868\.png/i.test(src)) ||
     photos[0] ||

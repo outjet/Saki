@@ -10,29 +10,43 @@ type FormState =
 
 export function InquiryForm({ propertySlug }: { propertySlug: string }) {
   const [state, setState] = useState<FormState>({ status: "idle" });
+  const endpoint =
+    process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT?.trim() ||
+    "https://formspree.io/f/mykdpdkz";
 
-  async function submit(formData: FormData) {
+  async function submit(form: HTMLFormElement) {
     setState({ status: "submitting" });
     try {
-      const endpoint =
-        process.env.NEXT_PUBLIC_INQUIRY_ENDPOINT?.trim() || "/api/inquire";
-
-      const payload = {
-        propertySlug,
-        name: String(formData.get("name") ?? ""),
-        email: String(formData.get("email") ?? ""),
-        phone: String(formData.get("phone") ?? ""),
-        message: String(formData.get("message") ?? "")
-      };
+      const formData = new FormData(form);
+      const name = String(formData.get("name") ?? "");
+      const email = String(formData.get("email") ?? "");
+      const phone = String(formData.get("phone") ?? "");
+      if (!name || !email || !phone) {
+        throw new Error("Name, email, and phone are required.");
+      }
+      formData.set("propertySlug", propertySlug);
+      formData.set("source", "listing-contact");
+      formData.set("_subject", `Listing inquiry: ${propertySlug}`);
 
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload)
+        headers: { Accept: "application/json" },
+        body: formData
       });
 
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Submission failed");
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; errors?: { message?: string }[] }
+        | null;
+
+      if (!res.ok) {
+        const message =
+          data?.errors?.map((e) => e.message).filter(Boolean).join(", ") ||
+          data?.error ||
+          "Submission failed";
+        throw new Error(message);
+      }
+
+      form.reset();
       setState({
         status: "success",
         message: "Thanks — your inquiry was sent. We’ll get back to you shortly."
@@ -50,10 +64,13 @@ export function InquiryForm({ propertySlug }: { propertySlug: string }) {
       className="card p-6"
       onSubmit={(e) => {
         e.preventDefault();
-        void submit(new FormData(e.currentTarget));
+        void submit(e.currentTarget);
       }}
       aria-label="Inquiry form"
     >
+      <div className="mb-4">
+        <p className="text-base font-semibold text-ink-950">Contact us</p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-ink-900">
           Name
@@ -75,23 +92,15 @@ export function InquiryForm({ propertySlug }: { propertySlug: string }) {
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-ink-900">
-          Phone (optional)
+          Phone
           <input
             name="phone"
+            required
             className="h-11 rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-ink-400"
             placeholder="(555) 555-5555"
           />
         </label>
         <div className="hidden sm:block" />
-        <label className="grid gap-2 text-sm font-medium text-ink-900 sm:col-span-2">
-          Message
-          <textarea
-            name="message"
-            rows={4}
-            className="rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-ink-400"
-            placeholder="I’d like to schedule a showing…"
-          />
-        </label>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -107,11 +116,7 @@ export function InquiryForm({ propertySlug }: { propertySlug: string }) {
           <p className="text-sm text-ink-700">{state.message}</p>
         ) : state.status === "error" ? (
           <p className="text-sm text-red-700">{state.message}</p>
-        ) : (
-          <p className="text-sm text-ink-600">
-          
-          </p>
-        )}
+        ) : null}
       </div>
     </form>
   );

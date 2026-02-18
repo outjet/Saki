@@ -6,7 +6,7 @@ import {
   ownerAllowlist
 } from "@/lib/firebase-admin";
 
-type Folder = "hero" | "photos" | "floorplans" | "docs";
+type Folder = "hero" | "photos" | "floorplans" | "backgrounds" | "docs";
 
 function safeName(name: string) {
   return name
@@ -74,7 +74,13 @@ async function authorize(req: Request) {
 }
 
 function normalizeFolder(value: string): Folder | null {
-  if (value === "hero" || value === "photos" || value === "floorplans" || value === "docs") {
+  if (
+    value === "hero" ||
+    value === "photos" ||
+    value === "floorplans" ||
+    value === "backgrounds" ||
+    value === "docs"
+  ) {
     return value;
   }
   return null;

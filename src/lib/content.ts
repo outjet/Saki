@@ -7,7 +7,6 @@ import {
 } from "@/lib/property-store";
 
 const CONTENT_ROOT = path.join(process.cwd(), "content", "properties");
-const PUBLIC_LISTINGS_ROOT = path.join(process.cwd(), "public", "listings");
 
 async function fileExists(p: string) {
   try {
@@ -18,32 +17,6 @@ async function fileExists(p: string) {
   }
 }
 
-function isMediaFile(name: string) {
-  const lower = name.toLowerCase();
-  return (
-    lower.endsWith(".jpg") ||
-    lower.endsWith(".jpeg") ||
-    lower.endsWith(".png") ||
-    lower.endsWith(".webp") ||
-    lower.endsWith(".avif") ||
-    lower.endsWith(".svg")
-  );
-}
-
-async function listPublicFiles(slug: string, subdir: string) {
-  const dir = path.join(PUBLIC_LISTINGS_ROOT, slug, subdir);
-  if (!(await fileExists(dir))) return [];
-
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  const files = entries
-    .filter((e) => e.isFile())
-    .map((e) => e.name)
-    .filter((n) => (subdir === "docs" ? true : isMediaFile(n)))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-
-  return files.map((f) => `/listings/${slug}/${subdir}/${f}`);
-}
-
 async function loadProperty(slug: string): Promise<Property> {
   const jsonPath = path.join(CONTENT_ROOT, slug, "property.json");
   const raw = await fs.readFile(jsonPath, "utf8");
@@ -51,28 +24,14 @@ async function loadProperty(slug: string): Promise<Property> {
 
   const media = parsed.media ?? {};
 
-  const hero =
-    media.hero && media.hero.length > 0 ? media.hero : await listPublicFiles(slug, "hero");
-
-  const photos =
-    media.photos && media.photos.length > 0
-      ? media.photos
-      : await listPublicFiles(slug, "photos");
+  const hero = Array.isArray(media.hero) ? media.hero : [];
+  const photos = Array.isArray(media.photos) ? media.photos : [];
+  const backgrounds = Array.isArray(media.backgrounds) ? media.backgrounds : [];
 
   const mergedPhotos = Array.from(new Set([...hero, ...photos]));
 
-  const floorplans =
-    media.floorplans && media.floorplans.length > 0
-      ? media.floorplans
-      : await listPublicFiles(slug, "floorplans");
-
-  const docs =
-    media.documents && media.documents.length > 0
-      ? media.documents
-      : (await listPublicFiles(slug, "docs")).map((href) => ({
-          label: path.basename(href),
-          href
-        }));
+  const floorplans = Array.isArray(media.floorplans) ? media.floorplans : [];
+  const docs = Array.isArray(media.documents) ? media.documents : [];
 
   return {
     ...parsed,
@@ -82,6 +41,9 @@ async function loadProperty(slug: string): Promise<Property> {
       hero,
       photos: mergedPhotos,
       floorplans,
+      backgrounds,
+      overviewBackdrop:
+        media.overviewBackdrop || backgrounds[0] || mergedPhotos[0],
       documents: docs
     }
   };

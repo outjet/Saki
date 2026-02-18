@@ -15,6 +15,10 @@ env:
   - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     secret: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
+  # Public Formspree endpoint for contact form submissions.
+  - variable: NEXT_PUBLIC_FORMSPREE_ENDPOINT
+    value: "https://formspree.io/f/mykdpdkz"
+
   # Server-side owner access list.
   - variable: OWNER_EMAIL_ALLOWLIST
     value: "outjsso@gmail.com,robert.bardwell@gmail.com,carolyn.saki@gmail.com,jsaki00@gmail.com,mrjohnsaki@gmail.com"

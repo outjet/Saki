@@ -1,6 +1,6 @@
 # Saki — Property Listing Demo
 
-Modern single-property / portfolio listing site built with Next.js + Tailwind and **folder-based content** (easy updates without touching code).
+Modern single-property / portfolio listing site built with Next.js + Tailwind and Firestore/Storage-backed owner management.
 
 ## Quickstart
 
@@ -28,22 +28,20 @@ In Firebase Console → App Hosting → Domains, add `emmons.casa` (and `www` if
 
 ## Content model (owner-friendly)
 
-Each property is a folder:
+Listing content is managed from `/owner` and stored in Firebase:
 
-- `content/properties/<slug>/property.json` — all text + structured fields
-- `public/listings/<slug>/hero/` — optional hero carousel images (jpg/png/webp/svg)
-- `public/listings/<slug>/photos/` — drop photos here (jpg/png/webp/svg)
-- `public/listings/<slug>/floorplans/` — optional
-- `public/listings/<slug>/docs/` — optional PDFs/brochures
+- Firestore document: `properties/<slug>` for listing fields and media order
+- Storage objects: `listings/<slug>/{hero,photos,floorplans,backgrounds,docs}/...`
 
-If `property.json` omits `hero`, `photos`, `floorplans`, or `documents`, the site will auto-discover files from those folders.
+Local `content/properties/<slug>/property.json` remains a fallback seed for development.
 
 ## Inquiry handling
 
-The inquiry form posts to `POST /api/inquire` and currently logs submissions on the server.
-Wire it to email/SMS by updating `src/app/api/inquire/route.ts`.
+The contact form posts directly to Formspree using AJAX.
 
-In static hosting, `/api/inquire` won’t exist. Set `NEXT_PUBLIC_INQUIRY_ENDPOINT` to a webhook / Firebase Function URL (or swap the form to a provider).
+Set:
+
+- `NEXT_PUBLIC_FORMSPREE_ENDPOINT` (example: `https://formspree.io/f/mykdpdkz`)
 
 ## Google Maps
 
@@ -65,6 +63,8 @@ Client (public):
 - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
 - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` (optional)
 - `NEXT_PUBLIC_FIREBASE_APP_ID` (optional)
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- `NEXT_PUBLIC_FORMSPREE_ENDPOINT`
 - `FIREBASE_WEB_CONFIG_JSON` (recommended on Firebase App Hosting; JSON containing the same fields above)
 
 Server (private):
@@ -75,4 +75,4 @@ Server (private):
 ### Data storage
 
 - Firestore: `properties/<slug>` (same shape as `property.json`, plus metadata)
-- Storage: `listings/<slug>/{hero,photos,floorplans,docs}/...`
+- Storage: `listings/<slug>/{hero,photos,floorplans,backgrounds,docs}/...`

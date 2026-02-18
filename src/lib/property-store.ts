@@ -1,7 +1,5 @@
 import type { Property } from "@/lib/types";
 import { adminBucket, adminDb } from "@/lib/firebase-admin";
-import fs from "node:fs/promises";
-import path from "node:path";
 
 function isServerFirebaseAvailable() {
   return Boolean(
@@ -16,45 +14,10 @@ function byName(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true });
 }
 
-const PUBLIC_LISTINGS_ROOT = path.join(process.cwd(), "public", "listings");
-const ENABLE_PUBLIC_LISTINGS_FALLBACK =
-  String(process.env.ENABLE_PUBLIC_LISTINGS_FALLBACK ?? "true").toLowerCase() !==
-  "false";
-
-async function fileExists(p: string) {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isMediaFile(name: string) {
-  const lower = name.toLowerCase();
-  return (
-    lower.endsWith(".jpg") ||
-    lower.endsWith(".jpeg") ||
-    lower.endsWith(".png") ||
-    lower.endsWith(".webp") ||
-    lower.endsWith(".avif") ||
-    lower.endsWith(".svg")
-  );
-}
-
-async function listPublicFiles(slug: string, subdir: string) {
-  const dir = path.join(PUBLIC_LISTINGS_ROOT, slug, subdir);
-  if (!(await fileExists(dir))) return [];
-
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  const files = entries
-    .filter((e) => e.isFile())
-    .map((e) => e.name)
-    .filter((n) => (subdir === "docs" ? true : isMediaFile(n)))
-    .sort(byName);
-
-  return files.map((f) => `/listings/${slug}/${subdir}/${f}`);
-}
+const signedUrlCache = new Map<
+  string,
+  { url: string; expiresAtMs: number }
+>();
 
 async function listObjectPaths(prefix: string) {
   const bucket = adminBucket();
@@ -67,14 +30,21 @@ async function listObjectPaths(prefix: string) {
 
 async function signedReadUrls(objectPaths: string[], hours = 24) {
   const bucket = adminBucket();
-  const expires = Date.now() + hours * 60 * 60 * 1000;
+  const now = Date.now();
+  const expiresAtMs = now + hours * 60 * 60 * 1000;
+  const expires = new Date(expiresAtMs);
   const urls = await Promise.all(
     objectPaths.map(async (name) => {
+      const cached = signedUrlCache.get(name);
+      if (cached && cached.expiresAtMs - now > 5 * 60 * 1000) {
+        return cached.url;
+      }
       const [url] = await bucket.file(name).getSignedUrl({
         version: "v4",
         action: "read",
         expires
       });
+      signedUrlCache.set(name, { url, expiresAtMs });
       return url;
     })
   );
@@ -102,6 +72,13 @@ async function resolveMediaRefs(refs: string[] | undefined) {
   }
 
   return cleaned.map((value) => signedByPath.get(value) ?? value);
+}
+
+async function resolveMediaRef(ref: string | undefined) {
+  const cleaned = String(ref ?? "").trim();
+  if (!cleaned || !isStorageObjectPath(cleaned)) return cleaned || undefined;
+  const [signed] = await signedReadUrls([cleaned]).catch(() => [] as string[]);
+  return signed || cleaned;
 }
 
 async function resolveDocumentRefs(
@@ -134,10 +111,12 @@ async function resolveDocumentRefs(
 
 async function resolveMediaForRender(media: Property["media"] | undefined) {
   const base = media ?? {};
-  const [hero, photos, floorplans, documents] = await Promise.all([
+  const [hero, photos, floorplans, backgrounds, overviewBackdrop, documents] = await Promise.all([
     resolveMediaRefs(base.hero),
     resolveMediaRefs(base.photos),
     resolveMediaRefs(base.floorplans),
+    resolveMediaRefs(base.backgrounds),
+    resolveMediaRef(base.overviewBackdrop),
     resolveDocumentRefs(base.documents)
   ]);
 
@@ -146,16 +125,19 @@ async function resolveMediaForRender(media: Property["media"] | undefined) {
     hero,
     photos,
     floorplans,
+    backgrounds,
+    overviewBackdrop: overviewBackdrop || backgrounds[0] || photos[0] || hero[0],
     documents
   };
 }
 
 async function autoDiscoverMedia(slug: string) {
   const base = `listings/${slug}/`;
-  const [heroPaths, photoPaths, floorplanPaths, docPaths] = await Promise.all([
+  const [heroPaths, photoPaths, floorplanPaths, backgroundPaths, docPaths] = await Promise.all([
     listObjectPaths(`${base}hero/`).catch(() => [] as string[]),
     listObjectPaths(`${base}photos/`).catch(() => [] as string[]),
     listObjectPaths(`${base}floorplans/`).catch(() => [] as string[]),
+    listObjectPaths(`${base}backgrounds/`).catch(() => [] as string[]),
     listObjectPaths(`${base}docs/`).catch(() => [] as string[])
   ]);
 
@@ -163,41 +145,25 @@ async function autoDiscoverMedia(slug: string) {
     heroPaths.length === 0 &&
     photoPaths.length === 0 &&
     floorplanPaths.length === 0 &&
+    backgroundPaths.length === 0 &&
     docPaths.length === 0;
 
   if (noCloudMedia) {
-    if (!ENABLE_PUBLIC_LISTINGS_FALLBACK) {
-      return {
-        hero: [] as string[],
-        photos: [] as string[],
-        floorplans: [] as string[],
-        documents: [] as { label: string; href: string }[]
-      };
-    }
-
-    const [hero, photos, floorplans, docs] = await Promise.all([
-      listPublicFiles(slug, "hero").catch(() => [] as string[]),
-      listPublicFiles(slug, "photos").catch(() => [] as string[]),
-      listPublicFiles(slug, "floorplans").catch(() => [] as string[]),
-      listPublicFiles(slug, "docs").catch(() => [] as string[])
-    ]);
-
-    const mergedPhotos = Array.from(new Set([...hero, ...photos]));
     return {
-      hero,
-      photos: mergedPhotos,
-      floorplans,
-      documents: docs.map((href) => ({
-        label: href.split("/").pop() ?? "Document",
-        href
-      }))
+      hero: [] as string[],
+      photos: [] as string[],
+      floorplans: [] as string[],
+      backgrounds: [] as string[],
+      overviewBackdrop: undefined as string | undefined,
+      documents: [] as { label: string; href: string }[]
     };
   }
 
-  const [heroUrls, photoUrls, floorUrls, docUrls] = await Promise.all([
+  const [heroUrls, photoUrls, floorUrls, backgroundUrls, docUrls] = await Promise.all([
     signedReadUrls(heroPaths),
     signedReadUrls(photoPaths),
     signedReadUrls(floorplanPaths),
+    signedReadUrls(backgroundPaths),
     signedReadUrls(docPaths)
   ]);
 
@@ -207,6 +173,8 @@ async function autoDiscoverMedia(slug: string) {
     hero: heroUrls,
     photos: mergedPhotos,
     floorplans: floorUrls,
+    backgrounds: backgroundUrls,
+    overviewBackdrop: backgroundUrls[0],
     documents: docUrls.map((href, idx) => ({
       label: docPaths[idx]?.split("/").pop() ?? "Document",
       href
@@ -240,6 +208,7 @@ export async function getPropertyFromFirestore(
     !media.hero?.length ||
     !media.photos?.length ||
     !media.floorplans?.length ||
+    !media.backgrounds?.length ||
     !media.documents?.length;
 
   const discovered = needsDiscover ? await autoDiscoverMedia(slug).catch(() => null) : null;
@@ -250,6 +219,14 @@ export async function getPropertyFromFirestore(
     floorplans: media.floorplans?.length
       ? media.floorplans
       : discovered?.floorplans ?? [],
+    backgrounds: media.backgrounds?.length
+      ? media.backgrounds
+      : discovered?.backgrounds ?? [],
+    overviewBackdrop:
+      media.overviewBackdrop ||
+      media.backgrounds?.[0] ||
+      discovered?.overviewBackdrop ||
+      discovered?.backgrounds?.[0],
     documents: media.documents?.length ? media.documents : discovered?.documents ?? []
   };
 

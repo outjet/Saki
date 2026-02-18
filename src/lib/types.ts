@@ -33,6 +33,8 @@ export type PropertyMedia = {
   hero?: string[];
   photos?: string[];
   floorplans?: string[];
+  backgrounds?: string[];
+  overviewBackdrop?: string;
   documents?: { label: string; href: string }[];
   video?: {
     title?: string;
