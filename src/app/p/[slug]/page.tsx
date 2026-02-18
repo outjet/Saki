@@ -49,6 +49,7 @@ export default async function PropertyPage({
   const hasVideo = Boolean(property.media?.video?.embedUrl || property.media?.video?.mp4Url);
   const hasMap = Boolean(property.location);
   const hasGoogleKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+  const contactVideo = property.media?.contactVideo || property.media?.contactVideos?.[0];
   const overviewBackdrop =
     property.media?.overviewBackdrop ||
     property.media?.backgrounds?.[0] ||
@@ -269,26 +270,52 @@ export default async function PropertyPage({
         </Section>
       ) : null}
 
-      <Section id="contact" title="Contact">
-        <div className="grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            {property.agent ? (
-              <AgentCard agent={property.agent} />
-            ) : (
-              <div className="card p-6">
-                <p className="text-sm font-semibold text-ink-950">Seller</p>
-                <p className="mt-2 text-sm text-ink-700">
-                  Add agent/seller details in{" "}
-                  <span className="font-mono text-[0.92em]">property.json</span>.
+      <section id="contact" className="relative py-10 sm:py-12">
+        {contactVideo ? (
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+          >
+            <source src={contactVideo} />
+          </video>
+        ) : null}
+        <div className="absolute inset-0 bg-black/65" aria-hidden="true" />
+        <div className="relative container-page">
+          <div className="rounded-3xl border border-white/20 bg-slate-700/35 p-6 backdrop-blur-sm sm:p-8">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
+                <p className="mt-1 text-sm text-white/85">
+                  Reach out to ask questions or request a showing.
                 </p>
               </div>
-            )}
-          </div>
-          <div className="lg:col-span-8">
-            <InquiryForm propertySlug={property.slug} />
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-12">
+              <div className="lg:col-span-4">
+                {property.agent ? (
+                  <AgentCard agent={property.agent} tone="dark" />
+                ) : (
+                  <div className="rounded-2xl border border-white/20 bg-black/20 p-6">
+                    <p className="text-sm font-semibold text-white">Seller</p>
+                    <p className="mt-2 text-sm text-white/80">
+                      Add agent/seller details in{" "}
+                      <span className="font-mono text-[0.92em]">property.json</span>.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="lg:col-span-8">
+                <InquiryForm propertySlug={property.slug} tone="dark" />
+              </div>
+            </div>
           </div>
         </div>
-      </Section>
+      </section>
 
       <footer className="border-t border-ink-100">
         <div className="container-page py-10 text-sm text-ink-600">

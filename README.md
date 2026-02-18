@@ -31,7 +31,7 @@ In Firebase Console → App Hosting → Domains, add `emmons.casa` (and `www` if
 Listing content is managed from `/owner` and stored in Firebase:
 
 - Firestore document: `properties/<slug>` for listing fields and media order
-- Storage objects: `listings/<slug>/{hero,photos,floorplans,backgrounds,docs}/...`
+- Storage objects: `listings/<slug>/{hero,photos,floorplans,backgrounds,contactvideo,docs}/...`
 
 Local `content/properties/<slug>/property.json` remains a fallback seed for development.
 
@@ -75,4 +75,4 @@ Server (private):
 ### Data storage
 
 - Firestore: `properties/<slug>` (same shape as `property.json`, plus metadata)
-- Storage: `listings/<slug>/{hero,photos,floorplans,backgrounds,docs}/...`
+- Storage: `listings/<slug>/{hero,photos,floorplans,backgrounds,contactvideo,docs}/...`

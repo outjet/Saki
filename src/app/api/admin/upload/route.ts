@@ -6,7 +6,13 @@ import {
   ownerAllowlist
 } from "@/lib/firebase-admin";
 
-type Folder = "hero" | "photos" | "floorplans" | "backgrounds" | "docs";
+type Folder =
+  | "hero"
+  | "photos"
+  | "floorplans"
+  | "backgrounds"
+  | "contactvideo"
+  | "docs";
 
 function safeName(name: string) {
   return name
@@ -79,6 +85,7 @@ function normalizeFolder(value: string): Folder | null {
     value === "photos" ||
     value === "floorplans" ||
     value === "backgrounds" ||
+    value === "contactvideo" ||
     value === "docs"
   ) {
     return value;

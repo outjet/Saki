@@ -7,7 +7,13 @@ import {
   ownerAllowlist
 } from "@/lib/firebase-admin";
 
-type Folder = "hero" | "photos" | "floorplans" | "backgrounds" | "docs";
+type Folder =
+  | "hero"
+  | "photos"
+  | "floorplans"
+  | "backgrounds"
+  | "contactvideo"
+  | "docs";
 
 type MediaItem = {
   objectPath: string;
@@ -27,6 +33,8 @@ type UpdatePayload = {
     floorplans?: string[];
     backgrounds?: string[];
     overviewBackdrop?: string;
+    contactVideos?: string[];
+    contactVideo?: string;
     documents?: { label?: string; href?: string }[];
   };
 };
@@ -189,11 +197,20 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [heroItems, photoItems, floorplanItems, backgroundItems, docItems, snap] = await Promise.all([
+    const [
+      heroItems,
+      photoItems,
+      floorplanItems,
+      backgroundItems,
+      contactVideoItems,
+      docItems,
+      snap
+    ] = await Promise.all([
       listFolderItems(slug, "hero"),
       listFolderItems(slug, "photos"),
       listFolderItems(slug, "floorplans"),
       listFolderItems(slug, "backgrounds"),
+      listFolderItems(slug, "contactvideo"),
       listFolderItems(slug, "docs"),
       adminDb().doc(`properties/${slug}`).get()
     ]);
@@ -212,6 +229,10 @@ export async function GET(req: Request) {
     const backgroundOrder = normalizePathList(slug, "backgrounds", [
       ...(Array.isArray(media.backgrounds) ? media.backgrounds : []),
       media.overviewBackdrop
+    ]);
+    const contactVideoOrder = normalizePathList(slug, "contactvideo", [
+      ...(Array.isArray(media.contactVideos) ? media.contactVideos : []),
+      media.contactVideo
     ]);
     const docOrder = normalizePathList(
       slug,
@@ -235,13 +256,24 @@ export async function GET(req: Request) {
       backgroundItems.map((item) => item.objectPath),
       backgroundOrder
     );
+    const orderedContactVideoPaths = mergeOrdered(
+      contactVideoItems.map((item) => item.objectPath),
+      contactVideoOrder
+    );
     const orderedDocPaths = mergeOrdered(
       docItems.map((item) => item.objectPath),
       docOrder
     );
 
     const byPath = new Map<string, MediaItem>();
-    for (const item of [...heroItems, ...photoItems, ...floorplanItems, ...backgroundItems, ...docItems]) {
+    for (const item of [
+      ...heroItems,
+      ...photoItems,
+      ...floorplanItems,
+      ...backgroundItems,
+      ...contactVideoItems,
+      ...docItems
+    ]) {
       byPath.set(item.objectPath, item);
     }
 
@@ -261,6 +293,7 @@ export async function GET(req: Request) {
         photos: orderedPhotoPaths.map((path) => byPath.get(path)).filter(Boolean),
         floorplans: orderedFloorPaths.map((path) => byPath.get(path)).filter(Boolean),
         backgrounds: orderedBackgroundPaths.map((path) => byPath.get(path)).filter(Boolean),
+        contactVideos: orderedContactVideoPaths.map((path) => byPath.get(path)).filter(Boolean),
         docs: orderedDocs
       }
     });
@@ -291,6 +324,7 @@ export async function POST(req: Request) {
     photos: normalizePathList(slug, "photos", body?.media?.photos),
     floorplans: normalizePathList(slug, "floorplans", body?.media?.floorplans),
     backgrounds: normalizePathList(slug, "backgrounds", body?.media?.backgrounds),
+    contactVideos: normalizePathList(slug, "contactvideo", body?.media?.contactVideos),
     documents: normalizeDocuments(slug, body?.media?.documents)
   };
 
@@ -301,7 +335,8 @@ export async function POST(req: Request) {
         {
           media: {
             ...nextMedia,
-            overviewBackdrop: nextMedia.backgrounds[0] || null
+            overviewBackdrop: nextMedia.backgrounds[0] || null,
+            contactVideo: nextMedia.contactVideos[0] || null
           },
           updatedAt: new Date().toISOString(),
           updatedBy: { uid: auth.decoded.uid, email: auth.email }
@@ -370,6 +405,13 @@ export async function DELETE(req: Request) {
           (p: string) => p !== objectPath
         )
       );
+      const nextContactVideos = normalizePathList(
+        slug,
+        "contactvideo",
+        (Array.isArray(media.contactVideos) ? media.contactVideos : []).filter(
+          (p: string) => p !== objectPath
+        )
+      );
       const nextDocuments = normalizeDocuments(
         slug,
         (Array.isArray(media.documents) ? media.documents : []).filter(
@@ -386,6 +428,8 @@ export async function DELETE(req: Request) {
             floorplans: nextFloorplans,
             backgrounds: nextBackgrounds,
             overviewBackdrop: nextBackgrounds[0] || null,
+            contactVideos: nextContactVideos,
+            contactVideo: nextContactVideos[0] || null,
             documents: nextDocuments
           },
           updatedAt: new Date().toISOString(),

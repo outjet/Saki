@@ -27,6 +27,7 @@ async function loadProperty(slug: string): Promise<Property> {
   const hero = Array.isArray(media.hero) ? media.hero : [];
   const photos = Array.isArray(media.photos) ? media.photos : [];
   const backgrounds = Array.isArray(media.backgrounds) ? media.backgrounds : [];
+  const contactVideos = Array.isArray(media.contactVideos) ? media.contactVideos : [];
 
   const mergedPhotos = Array.from(new Set([...hero, ...photos]));
 
@@ -44,6 +45,8 @@ async function loadProperty(slug: string): Promise<Property> {
       backgrounds,
       overviewBackdrop:
         media.overviewBackdrop || backgrounds[0] || mergedPhotos[0],
+      contactVideos,
+      contactVideo: media.contactVideo || contactVideos[0],
       documents: docs
     }
   };

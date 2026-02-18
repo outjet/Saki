@@ -111,12 +111,23 @@ async function resolveDocumentRefs(
 
 async function resolveMediaForRender(media: Property["media"] | undefined) {
   const base = media ?? {};
-  const [hero, photos, floorplans, backgrounds, overviewBackdrop, documents] = await Promise.all([
+  const [
+    hero,
+    photos,
+    floorplans,
+    backgrounds,
+    overviewBackdrop,
+    contactVideos,
+    contactVideo,
+    documents
+  ] = await Promise.all([
     resolveMediaRefs(base.hero),
     resolveMediaRefs(base.photos),
     resolveMediaRefs(base.floorplans),
     resolveMediaRefs(base.backgrounds),
     resolveMediaRef(base.overviewBackdrop),
+    resolveMediaRefs(base.contactVideos),
+    resolveMediaRef(base.contactVideo),
     resolveDocumentRefs(base.documents)
   ]);
 
@@ -127,17 +138,27 @@ async function resolveMediaForRender(media: Property["media"] | undefined) {
     floorplans,
     backgrounds,
     overviewBackdrop: overviewBackdrop || backgrounds[0] || photos[0] || hero[0],
+    contactVideos,
+    contactVideo: contactVideo || contactVideos[0],
     documents
   };
 }
 
 async function autoDiscoverMedia(slug: string) {
   const base = `listings/${slug}/`;
-  const [heroPaths, photoPaths, floorplanPaths, backgroundPaths, docPaths] = await Promise.all([
+  const [
+    heroPaths,
+    photoPaths,
+    floorplanPaths,
+    backgroundPaths,
+    contactVideoPaths,
+    docPaths
+  ] = await Promise.all([
     listObjectPaths(`${base}hero/`).catch(() => [] as string[]),
     listObjectPaths(`${base}photos/`).catch(() => [] as string[]),
     listObjectPaths(`${base}floorplans/`).catch(() => [] as string[]),
     listObjectPaths(`${base}backgrounds/`).catch(() => [] as string[]),
+    listObjectPaths(`${base}contactvideo/`).catch(() => [] as string[]),
     listObjectPaths(`${base}docs/`).catch(() => [] as string[])
   ]);
 
@@ -146,6 +167,7 @@ async function autoDiscoverMedia(slug: string) {
     photoPaths.length === 0 &&
     floorplanPaths.length === 0 &&
     backgroundPaths.length === 0 &&
+    contactVideoPaths.length === 0 &&
     docPaths.length === 0;
 
   if (noCloudMedia) {
@@ -155,15 +177,19 @@ async function autoDiscoverMedia(slug: string) {
       floorplans: [] as string[],
       backgrounds: [] as string[],
       overviewBackdrop: undefined as string | undefined,
+      contactVideos: [] as string[],
+      contactVideo: undefined as string | undefined,
       documents: [] as { label: string; href: string }[]
     };
   }
 
-  const [heroUrls, photoUrls, floorUrls, backgroundUrls, docUrls] = await Promise.all([
+  const [heroUrls, photoUrls, floorUrls, backgroundUrls, contactVideoUrls, docUrls] =
+    await Promise.all([
     signedReadUrls(heroPaths),
     signedReadUrls(photoPaths),
     signedReadUrls(floorplanPaths),
     signedReadUrls(backgroundPaths),
+    signedReadUrls(contactVideoPaths),
     signedReadUrls(docPaths)
   ]);
 
@@ -175,6 +201,8 @@ async function autoDiscoverMedia(slug: string) {
     floorplans: floorUrls,
     backgrounds: backgroundUrls,
     overviewBackdrop: backgroundUrls[0],
+    contactVideos: contactVideoUrls,
+    contactVideo: contactVideoUrls[0],
     documents: docUrls.map((href, idx) => ({
       label: docPaths[idx]?.split("/").pop() ?? "Document",
       href
@@ -209,6 +237,7 @@ export async function getPropertyFromFirestore(
     !media.photos?.length ||
     !media.floorplans?.length ||
     !media.backgrounds?.length ||
+    !media.contactVideos?.length ||
     !media.documents?.length;
 
   const discovered = needsDiscover ? await autoDiscoverMedia(slug).catch(() => null) : null;
@@ -227,6 +256,14 @@ export async function getPropertyFromFirestore(
       media.backgrounds?.[0] ||
       discovered?.overviewBackdrop ||
       discovered?.backgrounds?.[0],
+    contactVideos: media.contactVideos?.length
+      ? media.contactVideos
+      : discovered?.contactVideos ?? [],
+    contactVideo:
+      media.contactVideo ||
+      media.contactVideos?.[0] ||
+      discovered?.contactVideo ||
+      discovered?.contactVideos?.[0],
     documents: media.documents?.length ? media.documents : discovered?.documents ?? []
   };
 

@@ -31,7 +31,13 @@ type Draft = {
   lon: string;
 };
 
-type MediaFolder = "hero" | "photos" | "floorplans" | "backgrounds" | "docs";
+type MediaFolder =
+  | "hero"
+  | "photos"
+  | "floorplans"
+  | "backgrounds"
+  | "contactvideo"
+  | "docs";
 
 type OwnerMediaItem = {
   objectPath: string;
@@ -48,6 +54,7 @@ type OwnerMediaState = {
   photos: OwnerMediaItem[];
   floorplans: OwnerMediaItem[];
   backgrounds: OwnerMediaItem[];
+  contactVideos: OwnerMediaItem[];
   docs: OwnerMediaItem[];
 };
 
@@ -121,6 +128,7 @@ const emptyMediaState: OwnerMediaState = {
   photos: [],
   floorplans: [],
   backgrounds: [],
+  contactVideos: [],
   docs: []
 };
 
@@ -349,6 +357,8 @@ export default function OwnerPage() {
       floorplans: nextMedia.floorplans.map((item) => item.objectPath),
       backgrounds: nextMedia.backgrounds.map((item) => item.objectPath),
       overviewBackdrop: nextMedia.backgrounds[0]?.objectPath || undefined,
+      contactVideos: nextMedia.contactVideos.map((item) => item.objectPath),
+      contactVideo: nextMedia.contactVideos[0]?.objectPath || undefined,
       documents: nextMedia.docs.map((item) => ({
         label: item.label?.trim() || item.name,
         href: item.objectPath
@@ -618,13 +628,33 @@ export default function OwnerPage() {
   }
 
   async function moveMediaItem(folder: MediaFolder, index: number, direction: -1 | 1) {
-    const list = media[folder];
+    const list =
+      folder === "contactvideo"
+        ? media.contactVideos
+        : folder === "hero"
+          ? media.hero
+          : folder === "photos"
+            ? media.photos
+            : folder === "floorplans"
+              ? media.floorplans
+              : folder === "backgrounds"
+                ? media.backgrounds
+                : media.docs;
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= list.length) return;
-    const nextMedia = {
-      ...media,
-      [folder]: reorderItems(list, index, nextIndex)
-    };
+    const reordered = reorderItems(list, index, nextIndex);
+    const nextMedia =
+      folder === "contactvideo"
+        ? { ...media, contactVideos: reordered }
+        : folder === "hero"
+          ? { ...media, hero: reordered }
+          : folder === "photos"
+            ? { ...media, photos: reordered }
+            : folder === "floorplans"
+              ? { ...media, floorplans: reordered }
+              : folder === "backgrounds"
+                ? { ...media, backgrounds: reordered }
+                : { ...media, docs: reordered };
     setMedia(nextMedia);
     setMediaDirty(true);
   }
@@ -994,6 +1024,12 @@ export default function OwnerPage() {
                   onPick={(files) => uploadFiles("backgrounds", files)}
                 />
                 <UploadRow
+                  label="Upload contact video"
+                  hint="Plays behind contact section"
+                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                  onPick={(files) => uploadFiles("contactvideo", files)}
+                />
+                <UploadRow
                   label="Upload hero"
                   hint="Top slideshow images"
                   onPick={(files) => uploadFiles("hero", files)}
@@ -1024,6 +1060,14 @@ export default function OwnerPage() {
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("backgrounds", index, dir)}
                   onDelete={(item) => void deleteMediaItem("backgrounds", item)}
+                />
+                <MediaPanel
+                  title="Contact Video Background"
+                  folder="contactvideo"
+                  items={media.contactVideos}
+                  busy={mediaBusy}
+                  onMove={(index, dir) => void moveMediaItem("contactvideo", index, dir)}
+                  onDelete={(item) => void deleteMediaItem("contactvideo", item)}
                 />
                 <MediaPanel
                   title="Hero"
@@ -1159,7 +1203,7 @@ function UploadRow({
         Choose Files
       </label>
       <p className="mt-2 text-xs text-ink-500">
-        Images: JPG, PNG, WEBP, AVIF. Docs: PDF.
+        Images: JPG, PNG, WEBP, AVIF. Videos: MP4, WEBM, MOV. Docs: PDF.
       </p>
     </div>
   );
