@@ -11,6 +11,10 @@ env:
   - variable: FIREBASE_WEB_CONFIG_JSON
     value: '{"apiKey":"AIzaSyBE8EpgfdwGDf8IFHrfChiZ45D3UIvmWPA","authDomain":"emmonscasa.firebaseapp.com","projectId":"emmonscasa","storageBucket":"emmonscasa.firebasestorage.app","messagingSenderId":"437496174414","appId":"1:437496174414:web:f9ddf79f97cd7fd454f01f"}'
 
+  # Public Maps key from Secret Manager.
+  - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    secret: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
   # Server-side owner access list.
   - variable: OWNER_EMAIL_ALLOWLIST
     value: "outjsso@gmail.com,robert.bardwell@gmail.com,carolyn.saki@gmail.com,jsaki00@gmail.com,mrjohnsaki@gmail.com"
