@@ -9,7 +9,7 @@ env:
   # Public Firebase web config as one JSON string (recommended for App Hosting).
   # Replace with your actual values from Firebase Console -> Project settings -> Your apps.
   - variable: FIREBASE_WEB_CONFIG_JSON
-    value: '{"apiKey":"AIzaSyCtJgqfC7xX5ck9Y3WuXd8AdlTNa4Ikm3s","authDomain":"emmons.casa","projectId":"437496174414","storageBucket":"emmonscasa.firebasestorage.app","messagingSenderId":"437496174414","appId":"1:437496174414:web:f9ddf79f97cd7fd454f01f"}'
+    value: '{"apiKey":"AIzaSyCtJgqfC7xX5ck9Y3WuXd8AdlTNa4Ikm3s","authDomain":"emmons.casa","projectId":"emmonscasa","storageBucket":"emmonscasa.firebasestorage.app","messagingSenderId":"437496174414","appId":"1:437496174414:web:f9ddf79f97cd7fd454f01f"}'
 
   # Server-side owner access list.
   - variable: OWNER_EMAIL_ALLOWLIST
