@@ -78,6 +78,75 @@ async function signedReadUrls(objectPaths: string[], hours = 24) {
   return urls;
 }
 
+function isStorageObjectPath(value: string) {
+  return value.startsWith("listings/");
+}
+
+function cleanStringList(list: string[] | undefined) {
+  return (list ?? []).map((v) => String(v ?? "").trim()).filter(Boolean);
+}
+
+async function resolveMediaRefs(refs: string[] | undefined) {
+  const cleaned = cleanStringList(refs);
+  const storagePaths = cleaned.filter(isStorageObjectPath);
+  if (storagePaths.length === 0) return cleaned;
+
+  const signed = await signedReadUrls(storagePaths).catch(() => [] as string[]);
+  const signedByPath = new Map<string, string>();
+  for (const [idx, path] of storagePaths.entries()) {
+    const url = signed[idx];
+    if (url) signedByPath.set(path, url);
+  }
+
+  return cleaned.map((value) => signedByPath.get(value) ?? value);
+}
+
+async function resolveDocumentRefs(
+  docs: { label: string; href: string }[] | undefined
+) {
+  const cleaned = (docs ?? [])
+    .map((doc) => ({
+      label: String(doc?.label ?? "").trim(),
+      href: String(doc?.href ?? "").trim()
+    }))
+    .filter((doc) => Boolean(doc.href));
+
+  const storagePaths = cleaned
+    .map((doc) => doc.href)
+    .filter(isStorageObjectPath);
+  if (storagePaths.length === 0) return cleaned;
+
+  const signed = await signedReadUrls(storagePaths).catch(() => [] as string[]);
+  const signedByPath = new Map<string, string>();
+  for (const [idx, path] of storagePaths.entries()) {
+    const url = signed[idx];
+    if (url) signedByPath.set(path, url);
+  }
+
+  return cleaned.map((doc) => ({
+    ...doc,
+    href: signedByPath.get(doc.href) ?? doc.href
+  }));
+}
+
+async function resolveMediaForRender(media: Property["media"] | undefined) {
+  const base = media ?? {};
+  const [hero, photos, floorplans, documents] = await Promise.all([
+    resolveMediaRefs(base.hero),
+    resolveMediaRefs(base.photos),
+    resolveMediaRefs(base.floorplans),
+    resolveDocumentRefs(base.documents)
+  ]);
+
+  return {
+    ...base,
+    hero,
+    photos,
+    floorplans,
+    documents
+  };
+}
+
 async function autoDiscoverMedia(slug: string) {
   const base = `listings/${slug}/`;
   const [heroPaths, photoPaths, floorplanPaths, docPaths] = await Promise.all([
@@ -161,20 +230,24 @@ export async function getPropertyFromFirestore(
     !media.floorplans?.length ||
     !media.documents?.length;
 
-  if (!needsDiscover) return base;
+  const discovered = needsDiscover ? await autoDiscoverMedia(slug).catch(() => null) : null;
+  const mergedMedia = {
+    ...media,
+    hero: media.hero?.length ? media.hero : discovered?.hero ?? [],
+    photos: media.photos?.length ? media.photos : discovered?.photos ?? [],
+    floorplans: media.floorplans?.length
+      ? media.floorplans
+      : discovered?.floorplans ?? [],
+    documents: media.documents?.length ? media.documents : discovered?.documents ?? []
+  };
 
-  const discovered = await autoDiscoverMedia(slug).catch(() => null);
-  if (!discovered) return base;
+  const resolvedMedia = await resolveMediaForRender(mergedMedia).catch(
+    () => mergedMedia
+  );
 
   return {
     ...base,
-    media: {
-      ...media,
-      hero: media.hero?.length ? media.hero : discovered.hero,
-      photos: media.photos?.length ? media.photos : discovered.photos,
-      floorplans: media.floorplans?.length ? media.floorplans : discovered.floorplans,
-      documents: media.documents?.length ? media.documents : discovered.documents
-    }
+    media: resolvedMedia
   };
 }
 

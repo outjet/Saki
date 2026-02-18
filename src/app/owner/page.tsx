@@ -1,7 +1,12 @@
 "use client";
 
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { useMemo, useState } from "react";
+import {
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut
+} from "firebase/auth";
+import { useEffect, useMemo, useState } from "react";
 import { firebaseAuth } from "@/lib/firebase-client";
 
 type Draft = {
@@ -26,7 +31,65 @@ type Draft = {
   lon: string;
 };
 
-const initial: Draft = {
+type MediaFolder = "hero" | "photos" | "floorplans" | "docs";
+
+type OwnerMediaItem = {
+  objectPath: string;
+  name: string;
+  signedUrl: string;
+  contentType?: string;
+  size?: string | number;
+  updated?: string;
+  label?: string;
+};
+
+type OwnerMediaState = {
+  hero: OwnerMediaItem[];
+  photos: OwnerMediaItem[];
+  floorplans: OwnerMediaItem[];
+  docs: OwnerMediaItem[];
+};
+
+type PropertyMediaExtras = {
+  video?: {
+    title?: string;
+    embedUrl?: string;
+    mp4Url?: string;
+    posterUrl?: string;
+  };
+  tours?: { label: string; href: string }[];
+};
+
+type LoadedProperty = {
+  slug?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+  };
+  price?: { amount?: number };
+  beds?: number;
+  baths?: number;
+  homeSqft?: number;
+  lot?: { acres?: number };
+  headline?: string;
+  description?: string;
+  features?: string[];
+  agent?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
+  openHouses?: { startIso?: string }[];
+  location?: { lat?: number; lon?: number };
+  media?: {
+    video?: PropertyMediaExtras["video"];
+    tours?: PropertyMediaExtras["tours"];
+  };
+};
+
+const initialDraft: Draft = {
   slug: "23760-emmons-road",
   street: "23760 Emmons Road",
   city: "Columbia Station",
@@ -39,28 +102,119 @@ const initial: Draft = {
   lotAcres: 2.84,
   headline: "Modern comfort on a private 2.84-acre setting.",
   description:
-    "Introducing 23760 Emmons Road, a stunning property located in Columbia Station, OH. This home offers comfort, privacy, and room to roam. Oversized windows fill the interior with natural light, and thoughtful finishes bring a warm, inviting feel throughout.\n\n(Replace this demo copy with your real description.)",
-  featuresText: "Hardwood floors\nOversized windows\nLarge lot\nPrivate setting\nUpdated kitchen\nThree-car garage",
-  agentName: "Cacey Example",
-  agentPhone: "(440) 555-0123",
-  agentEmail: "cacey@example.com",
-  openHouseIso: "2026-02-28T09:45:00-05:00",
-  lat: "41.2902254",
-  lon: "-81.8927872"
+    "Introducing 23760 Emmons Road, a stunning property located in Columbia Station, OH. This home offers comfort, privacy, and room to roam. Oversized windows fill the interior with natural light, and thoughtful finishes bring a warm, inviting feel throughout.",
+  featuresText:
+    "Hardwood floors\nOversized windows\nLarge lot\nPrivate setting\nUpdated kitchen\nThree-car garage",
+  agentName: "",
+  agentPhone: "",
+  agentEmail: "",
+  openHouseIso: "",
+  lat: "",
+  lon: ""
 };
 
-function downloadText(filename: string, text: string) {
-  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+const emptyMediaState: OwnerMediaState = {
+  hero: [],
+  photos: [],
+  floorplans: [],
+  docs: []
+};
+
+function safeSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w.\-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-/, "")
+    .replace(/-$/, "");
+}
+
+function asNumber(value: unknown, fallback: number) {
+  const next = Number(value);
+  return Number.isFinite(next) ? next : fallback;
+}
+
+function asString(value: unknown, fallback = "") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function draftFromProperty(property: LoadedProperty, current: Draft): Draft {
+  return {
+    slug: asString(property.slug, current.slug),
+    street: asString(property.address?.street, current.street),
+    city: asString(property.address?.city, current.city),
+    state: asString(property.address?.state, current.state),
+    zip: asString(property.address?.zip, current.zip),
+    price: asNumber(property.price?.amount, current.price),
+    beds: asNumber(property.beds, current.beds),
+    baths: asNumber(property.baths, current.baths),
+    homeSqft: asNumber(property.homeSqft, current.homeSqft),
+    lotAcres: asNumber(property.lot?.acres, current.lotAcres),
+    headline: asString(property.headline, current.headline),
+    description: asString(property.description, current.description),
+    featuresText: (Array.isArray(property.features) ? property.features : []).join("\n"),
+    agentName: asString(property.agent?.name, current.agentName),
+    agentPhone: asString(property.agent?.phone, current.agentPhone),
+    agentEmail: asString(property.agent?.email, current.agentEmail),
+    openHouseIso: asString(property.openHouses?.[0]?.startIso, current.openHouseIso),
+    lat:
+      property.location?.lat !== undefined
+        ? String(property.location.lat)
+        : current.lat,
+    lon:
+      property.location?.lon !== undefined
+        ? String(property.location.lon)
+        : current.lon
+  };
+}
+
+async function readResponse<T>(res: Response) {
+  const raw = await res.text();
+  try {
+    return { raw, data: JSON.parse(raw) as T };
+  } catch {
+    return { raw, data: null as T | null };
+  }
+}
+
+function isImageItem(item: OwnerMediaItem) {
+  if ((item.contentType || "").startsWith("image/")) return true;
+  const lower = item.name.toLowerCase();
+  return (
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.endsWith(".png") ||
+    lower.endsWith(".webp") ||
+    lower.endsWith(".avif") ||
+    lower.endsWith(".gif") ||
+    lower.endsWith(".svg")
+  );
+}
+
+function reorderItems(list: OwnerMediaItem[], from: number, to: number) {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) {
+    return list;
+  }
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
 }
 
 export default function OwnerPage() {
-  const [d, setD] = useState<Draft>(initial);
+  const [draft, setDraft] = useState<Draft>(initialDraft);
+  const [media, setMedia] = useState<OwnerMediaState>(emptyMediaState);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [loadingListing, setLoadingListing] = useState(false);
+  const [savingListing, setSavingListing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [mediaExtras, setMediaExtras] = useState<PropertyMediaExtras>({
+    video: { title: "Property video", embedUrl: "" },
+    tours: []
+  });
+
   const [authState, setAuthState] = useState<
     | { status: "signed_out" }
     | { status: "checking" }
@@ -76,7 +230,12 @@ export default function OwnerPage() {
         setAuthState({ status: "checking" });
         await signInWithPopup(auth, new GoogleAuthProvider());
       }
-      const token = await auth.currentUser!.getIdToken();
+      const user = auth.currentUser;
+      if (!user) {
+        setAuthState({ status: "signed_out" });
+        return null;
+      }
+      const token = await user.getIdToken();
       const res = await fetch("/api/admin/me", {
         headers: { authorization: `Bearer ${token}` }
       });
@@ -99,7 +258,9 @@ export default function OwnerPage() {
         setAuthState({ status: "forbidden", email: me.email });
         return null;
       }
-      setAuthState({ status: "ready", email: me.email!, token });
+
+      setAuthState({ status: "ready", email: me.email || "", token });
+      void loadMediaWithToken(token);
       return token;
     } catch (e) {
       setAuthState({
@@ -110,108 +271,433 @@ export default function OwnerPage() {
     }
   }
 
+  async function getToken() {
+    if (authState.status === "ready") return authState.token;
+    return ensureSignedIn();
+  }
+
   async function doSignOut() {
     await signOut(firebaseAuth());
     setAuthState({ status: "signed_out" });
+    setMedia(emptyMediaState);
+    setStatusMessage("");
   }
 
-  const json = useMemo(() => {
-    const features = d.featuresText
+  useEffect(() => {
+    const auth = firebaseAuth();
+    setAuthState({ status: "checking" });
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setAuthState({ status: "signed_out" });
+        setMedia(emptyMediaState);
+        return;
+      }
+      void (async () => {
+        try {
+          const token = await user.getIdToken();
+          const res = await fetch("/api/admin/me", {
+            headers: { authorization: `Bearer ${token}` }
+          });
+          const me = (await res.json()) as {
+            ok?: boolean;
+            allowed?: boolean;
+            email?: string;
+            error?: string;
+          };
+
+          if (res.status >= 500) {
+            setAuthState({
+              status: "error",
+              message: me.error ?? "Server auth is not configured."
+            });
+            return;
+          }
+
+          if (!me.ok || !me.allowed) {
+            setAuthState({ status: "forbidden", email: me.email });
+            return;
+          }
+
+          setAuthState({ status: "ready", email: me.email || "", token });
+        } catch (e) {
+          setAuthState({
+            status: "error",
+            message: e instanceof Error ? e.message : "Sign-in failed."
+          });
+        }
+      })();
+    });
+    return () => unsub();
+  }, []);
+
+  function mediaManifest(nextMedia: OwnerMediaState) {
+    return {
+      hero: nextMedia.hero.map((item) => item.objectPath),
+      photos: nextMedia.photos.map((item) => item.objectPath),
+      floorplans: nextMedia.floorplans.map((item) => item.objectPath),
+      documents: nextMedia.docs.map((item) => ({
+        label: item.label?.trim() || item.name,
+        href: item.objectPath
+      }))
+    };
+  }
+
+  async function loadListing(showMessage = true) {
+    const token = await getToken();
+    if (!token) return;
+    const slug = safeSlug(draft.slug);
+    if (!slug) {
+      setStatusMessage("Set a slug first.");
+      return;
+    }
+
+    setLoadingListing(true);
+    try {
+      const res = await fetch(`/api/admin/property?slug=${encodeURIComponent(slug)}`, {
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const { data, raw } = await readResponse<{ ok?: boolean; property?: LoadedProperty | null; error?: string }>(
+        res
+      );
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || raw || "Failed to load listing");
+      }
+
+      if (data.property) {
+        setDraft((prev) => draftFromProperty(data.property as LoadedProperty, prev));
+        setMediaExtras({
+          video: data.property.media?.video,
+          tours: data.property.media?.tours || []
+        });
+        if (showMessage) setStatusMessage("Loaded listing from Firestore.");
+      } else if (showMessage) {
+        setStatusMessage("No Firestore listing found for this slug yet.");
+      }
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : "Failed to load listing");
+    } finally {
+      setLoadingListing(false);
+    }
+  }
+
+  async function loadMedia(showMessage = false) {
+    const token = await getToken();
+    if (!token) return;
+    await loadMediaWithToken(token, showMessage);
+  }
+
+  async function loadMediaWithToken(token: string, showMessage = false) {
+    const slug = safeSlug(draft.slug);
+    if (!slug) return;
+
+    setMediaBusy(true);
+    try {
+      const res = await fetch(`/api/admin/media?slug=${encodeURIComponent(slug)}`, {
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const { data, raw } = await readResponse<{
+        ok?: boolean;
+        error?: string;
+        media?: OwnerMediaState;
+      }>(res);
+
+      if (!res.ok || !data?.ok || !data.media) {
+        throw new Error(data?.error || raw || "Failed to load media");
+      }
+
+      setMedia(data.media);
+      if (showMessage) setStatusMessage("Media refreshed from Storage.");
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : "Failed to load media");
+    } finally {
+      setMediaBusy(false);
+    }
+  }
+
+  async function persistMedia(nextMedia: OwnerMediaState) {
+    const token = await getToken();
+    if (!token) return false;
+    const slug = safeSlug(draft.slug);
+    if (!slug) {
+      setStatusMessage("Set a slug first.");
+      return false;
+    }
+
+    setMediaBusy(true);
+    try {
+      const res = await fetch("/api/admin/media", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ slug, media: mediaManifest(nextMedia) })
+      });
+      const { data, raw } = await readResponse<{ ok?: boolean; error?: string }>(res);
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || raw || "Failed to save media order");
+      }
+      setStatusMessage("Media order saved.");
+      return true;
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : "Failed to save media order");
+      return false;
+    } finally {
+      setMediaBusy(false);
+    }
+  }
+
+  async function saveListing() {
+    const token = await getToken();
+    if (!token) return;
+
+    const slug = safeSlug(draft.slug);
+    if (!slug) {
+      setStatusMessage("Set a slug first.");
+      return;
+    }
+
+    const features = draft.featuresText
       .split("\n")
-      .map((s) => s.trim())
+      .map((value) => value.trim())
       .filter(Boolean);
 
-    const property = {
-      address: { street: d.street, city: d.city, state: d.state, zip: d.zip },
-      price: { amount: Number(d.price || 0), currency: "USD" as const },
-      beds: Number(d.beds || 0),
-      baths: Number(d.baths || 0),
-      homeSqft: Number(d.homeSqft || 0),
-      lot: { acres: Number(d.lotAcres || 0) },
-      headline: d.headline,
-      description: d.description,
+    const payload = {
+      address: {
+        street: draft.street,
+        city: draft.city,
+        state: draft.state,
+        zip: draft.zip
+      },
+      price: { amount: Number(draft.price || 0), currency: "USD" as const },
+      beds: Number(draft.beds || 0),
+      baths: Number(draft.baths || 0),
+      homeSqft: Number(draft.homeSqft || 0),
+      lot: { acres: Number(draft.lotAcres || 0) },
+      headline: draft.headline,
+      description: draft.description,
       features,
       agent: {
-        name: d.agentName,
-        phone: d.agentPhone || undefined,
-        email: d.agentEmail || undefined
+        name: draft.agentName,
+        phone: draft.agentPhone || undefined,
+        email: draft.agentEmail || undefined
       },
-      openHouses: d.openHouseIso
-        ? [{ startIso: d.openHouseIso, note: "Open house" }]
-        : [],
+      openHouses: draft.openHouseIso ? [{ startIso: draft.openHouseIso, note: "Open house" }] : [],
       location:
-        d.lat && d.lon
-          ? { lat: Number(d.lat), lon: Number(d.lon) }
+        draft.lat && draft.lon
+          ? { lat: Number(draft.lat), lon: Number(draft.lon) }
           : undefined,
       media: {
-        // Leave these empty to auto-discover from /public/listings/<slug>/*
-        hero: [],
-        photos: [],
-        floorplans: [],
-        documents: [],
-        video: {
-          title: "Property video",
-          embedUrl: ""
-        },
-        tours: []
+        ...mediaManifest(media),
+        video: mediaExtras.video,
+        tours: mediaExtras.tours || []
       }
     };
 
-    return JSON.stringify(property, null, 2);
-  }, [d]);
-
-  async function saveToFirebase() {
-    const token = (await ensureSignedIn()) ?? null;
-    if (!token) return;
-    const payload = JSON.parse(json) as any;
-    const res = await fetch("/api/admin/property", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify({ slug: d.slug, property: payload })
-    });
-    const data = (await res.json()) as { ok?: boolean; error?: string };
-    if (!res.ok || !data.ok) throw new Error(data.error ?? "Save failed");
-  }
-
-  async function uploadFiles(folder: "hero" | "photos" | "floorplans" | "docs", files: FileList) {
-    const token = (await ensureSignedIn()) ?? null;
-    if (!token) return;
-
-    const list = Array.from(files);
-    for (const file of list) {
-      const res = await fetch("/api/admin/upload-url", {
+    setSavingListing(true);
+    try {
+      const res = await fetch("/api/admin/property", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          slug: d.slug,
-          folder,
-          filename: file.name,
-          contentType: file.type || "application/octet-stream"
-        })
+        body: JSON.stringify({ slug, property: payload })
       });
-      const raw = await res.text();
-      const data = (() => {
-        try {
-          return JSON.parse(raw) as { ok?: boolean; signedUrl?: string; error?: string };
-        } catch {
-          return null;
-        }
-      })();
-      if (!res.ok || !data?.ok || !data.signedUrl) {
-        const details = data?.error || raw?.slice(0, 200) || "";
-        throw new Error(
-          details ? `Failed to create upload URL: ${details}` : "Failed to create upload URL"
-        );
+      const { data, raw } = await readResponse<{ ok?: boolean; error?: string }>(res);
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || raw || "Save failed");
       }
-      const put = await fetch(data.signedUrl, {
-        method: "PUT",
-        headers: { "content-type": file.type || "application/octet-stream" },
-        body: file
-      });
-      if (!put.ok) {
-        throw new Error(`Upload failed for ${file.name}`);
-      }
+
+      setStatusMessage("Listing saved to Firestore.");
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingListing(false);
     }
+  }
+
+  async function uploadFiles(folder: MediaFolder, files: FileList) {
+    const token = await getToken();
+    if (!token) return;
+
+    const slug = safeSlug(draft.slug);
+    if (!slug) {
+      setStatusMessage("Set a slug first.");
+      return;
+    }
+
+    setMediaBusy(true);
+    try {
+      for (const file of Array.from(files)) {
+        const signRes = await fetch("/api/admin/upload-url", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            slug,
+            folder,
+            filename: file.name,
+            contentType: file.type || "application/octet-stream"
+          })
+        });
+
+        const signBody = await readResponse<{ ok?: boolean; error?: string; signedUrl?: string }>(
+          signRes
+        );
+        if (!signRes.ok || !signBody.data?.ok || !signBody.data.signedUrl) {
+          throw new Error(
+            signBody.data?.error || signBody.raw || "Failed to create upload URL"
+          );
+        }
+
+        const putRes = await fetch(signBody.data.signedUrl, {
+          method: "PUT",
+          headers: { "content-type": file.type || "application/octet-stream" },
+          body: file
+        });
+
+        if (!putRes.ok) {
+          throw new Error(`Upload failed for ${file.name}`);
+        }
+      }
+
+      await loadMedia();
+      setStatusMessage(`Uploaded ${files.length} file(s) to ${folder}.`);
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setMediaBusy(false);
+    }
+  }
+
+  async function deleteMediaItem(folder: MediaFolder, item: OwnerMediaItem) {
+    const token = await getToken();
+    if (!token) return;
+
+    const slug = safeSlug(draft.slug);
+    if (!slug) return;
+
+    setMediaBusy(true);
+    try {
+      const res = await fetch("/api/admin/media", {
+        method: "DELETE",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ slug, objectPath: item.objectPath })
+      });
+      const { data, raw } = await readResponse<{ ok?: boolean; error?: string }>(res);
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || raw || "Failed to delete media item");
+      }
+
+      await loadMedia();
+      setStatusMessage(`Deleted ${item.name} from ${folder}.`);
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setMediaBusy(false);
+    }
+  }
+
+  async function moveMediaItem(folder: MediaFolder, index: number, direction: -1 | 1) {
+    const list = media[folder];
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= list.length) return;
+    const nextMedia = {
+      ...media,
+      [folder]: reorderItems(list, index, nextIndex)
+    };
+    setMedia(nextMedia);
+    await persistMedia(nextMedia);
+  }
+
+  async function renameDocument(item: OwnerMediaItem, label: string) {
+    const nextMedia = {
+      ...media,
+      docs: media.docs.map((doc) =>
+        doc.objectPath === item.objectPath
+          ? { ...doc, label }
+          : doc
+      )
+    };
+    setMedia(nextMedia);
+    await persistMedia(nextMedia);
+  }
+
+  const propertyJson = useMemo(() => {
+    const features = draft.featuresText
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const data = {
+      address: {
+        street: draft.street,
+        city: draft.city,
+        state: draft.state,
+        zip: draft.zip
+      },
+      price: { amount: Number(draft.price || 0), currency: "USD" as const },
+      beds: Number(draft.beds || 0),
+      baths: Number(draft.baths || 0),
+      homeSqft: Number(draft.homeSqft || 0),
+      lot: { acres: Number(draft.lotAcres || 0) },
+      headline: draft.headline,
+      description: draft.description,
+      features,
+      agent: {
+        name: draft.agentName,
+        phone: draft.agentPhone || undefined,
+        email: draft.agentEmail || undefined
+      },
+      openHouses: draft.openHouseIso ? [{ startIso: draft.openHouseIso, note: "Open house" }] : [],
+      location:
+        draft.lat && draft.lon
+          ? { lat: Number(draft.lat), lon: Number(draft.lon) }
+          : undefined,
+      media: {
+        ...mediaManifest(media),
+        video: mediaExtras.video,
+        tours: mediaExtras.tours || []
+      }
+    };
+
+    return JSON.stringify(data, null, 2);
+  }, [draft, media, mediaExtras]);
+
+  if (authState.status !== "ready") {
+    return (
+      <main>
+        <section className="container-page py-16">
+          <div className="mx-auto max-w-xl rounded-2xl border border-ink-200 bg-white p-8 text-center">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-600">
+              Owner Panel
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink-950">
+              Authentication Required
+            </h1>
+            <p className="mt-3 text-sm text-ink-700">
+              Sign in with an authorized Google account to access listing management.
+            </p>
+
+            {authState.status === "checking" ? (
+              <p className="mt-6 text-sm text-ink-700">Checking session...</p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void ensureSignedIn()}
+                className="mt-6 rounded-xl bg-ink-950 px-5 py-3 text-sm font-semibold text-white"
+              >
+                Sign in with Google
+              </button>
+            )}
+
+            {authState.status === "forbidden" ? (
+              <p className="mt-4 text-sm text-red-700">
+                This account is not on the owner allowlist.
+              </p>
+            ) : authState.status === "error" ? (
+              <p className="mt-4 text-sm text-red-700">{authState.message}</p>
+            ) : null}
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -222,115 +708,102 @@ export default function OwnerPage() {
             Owner Panel
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            Update listing content
+            Listing Studio
           </h1>
-          {/* Helper paragraph removed per user request */}
+          <p className="mt-2 max-w-3xl text-sm text-ink-700">
+            Bucket-first media management with Firestore-backed listing data. Upload, preview,
+            reorder, and delete assets without touching repo files.
+          </p>
+
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            {authState.status === "ready" ? (
-              <>
-                <span className="text-sm text-ink-700">
-                  Signed in as <span className="font-medium">{authState.email}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void doSignOut()}
-                  className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 hover:bg-ink-50"
-                >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void ensureSignedIn()}
-                className="rounded-xl bg-ink-950 px-4 py-2 text-sm font-semibold text-white"
-              >
-                Sign in with Google
-              </button>
-            )}
-            {authState.status === "forbidden" ? (
-              <span className="text-sm text-red-700">
-                This account isn’t authorized.
-              </span>
-            ) : authState.status === "error" ? (
-              <span className="text-sm text-red-700">{authState.message}</span>
-            ) : null}
+            <span className="text-sm text-ink-700">
+              Signed in as <span className="font-medium">{authState.email}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void doSignOut()}
+              className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 hover:bg-ink-50"
+            >
+              Sign out
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadListing()}
+              disabled={loadingListing}
+              className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
+            >
+              {loadingListing ? "Loading..." : "Load Listing"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void saveListing()}
+              disabled={savingListing}
+              className="rounded-xl bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {savingListing ? "Saving..." : "Save Listing"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void loadMedia(true)}
+              disabled={mediaBusy}
+              className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
+            >
+              Refresh Media
+            </button>
           </div>
+
+          {statusMessage ? (
+            <p className="mt-3 text-sm text-ink-700">{statusMessage}</p>
+          ) : null}
         </div>
       </header>
 
       <section className="container-page py-10">
-        <div className="grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-7">
+        <div className="grid gap-6 xl:grid-cols-12">
+          <div className="xl:col-span-7">
             <div className="card p-6">
-              <div className="mb-6 grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <p className="text-sm font-semibold text-ink-950">Media uploads</p>
-                  <p className="mt-1 text-sm text-ink-600">
-                    Uploads go to Firebase Storage under{" "}
-                    <span className="font-mono text-[0.92em]">
-                      listings/{d.slug}/…
-                    </span>
-                    . The site will auto-discover them.
-                  </p>
-                </div>
-                <UploadRow
-                  label="Hero images"
-                  hint="Top carousel (wide images recommended)."
-                  onPick={(files) => uploadFiles("hero", files)}
-                />
-                <UploadRow
-                  label="Gallery photos"
-                  hint="Shown in Photos section (hero images are included too)."
-                  onPick={(files) => uploadFiles("photos", files)}
-                />
-                <UploadRow
-                  label="Floor plans"
-                  hint="Optional."
-                  onPick={(files) => uploadFiles("floorplans", files)}
-                />
-                <UploadRow
-                  label="Documents"
-                  hint="PDFs/brochures."
-                  accept=".pdf"
-                  onPick={(files) => uploadFiles("docs", files)}
-                />
-              </div>
+              <h2 className="text-base font-semibold text-ink-950">Listing Details</h2>
+              <p className="mt-1 text-sm text-ink-600">
+                This data persists in Firestore and remains intact across deployments.
+              </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <Field label="Slug">
                   <input
-                    value={d.slug}
-                    onChange={(e) => setD({ ...d, slug: e.target.value })}
+                    value={draft.slug}
+                    onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <div className="hidden sm:block" />
+
                 <Field label="Street">
                   <input
-                    value={d.street}
-                    onChange={(e) => setD({ ...d, street: e.target.value })}
+                    value={draft.street}
+                    onChange={(e) => setDraft({ ...draft, street: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="City">
                   <input
-                    value={d.city}
-                    onChange={(e) => setD({ ...d, city: e.target.value })}
+                    value={draft.city}
+                    onChange={(e) => setDraft({ ...draft, city: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="State">
                   <input
-                    value={d.state}
-                    onChange={(e) => setD({ ...d, state: e.target.value })}
+                    value={draft.state}
+                    onChange={(e) => setDraft({ ...draft, state: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
-                <Field label="Zip">
+                <Field label="ZIP">
                   <input
-                    value={d.zip}
-                    onChange={(e) => setD({ ...d, zip: e.target.value })}
+                    value={draft.zip}
+                    onChange={(e) => setDraft({ ...draft, zip: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
@@ -338,52 +811,48 @@ export default function OwnerPage() {
                 <Field label="Price (USD)">
                   <input
                     type="number"
-                    value={d.price}
-                    onChange={(e) => setD({ ...d, price: Number(e.target.value) })}
+                    value={draft.price}
+                    onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Beds">
                   <input
                     type="number"
-                    value={d.beds}
-                    onChange={(e) => setD({ ...d, beds: Number(e.target.value) })}
+                    value={draft.beds}
+                    onChange={(e) => setDraft({ ...draft, beds: Number(e.target.value) })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Baths">
                   <input
                     type="number"
-                    value={d.baths}
-                    onChange={(e) => setD({ ...d, baths: Number(e.target.value) })}
+                    value={draft.baths}
+                    onChange={(e) => setDraft({ ...draft, baths: Number(e.target.value) })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Home sqft">
                   <input
                     type="number"
-                    value={d.homeSqft}
-                    onChange={(e) =>
-                      setD({ ...d, homeSqft: Number(e.target.value) })
-                    }
+                    value={draft.homeSqft}
+                    onChange={(e) => setDraft({ ...draft, homeSqft: Number(e.target.value) })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Lot acres">
                   <input
                     type="number"
-                    value={d.lotAcres}
-                    onChange={(e) =>
-                      setD({ ...d, lotAcres: Number(e.target.value) })
-                    }
+                    value={draft.lotAcres}
+                    onChange={(e) => setDraft({ ...draft, lotAcres: Number(e.target.value) })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
 
                 <Field label="Headline">
                   <input
-                    value={d.headline}
-                    onChange={(e) => setD({ ...d, headline: e.target.value })}
+                    value={draft.headline}
+                    onChange={(e) => setDraft({ ...draft, headline: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
@@ -391,16 +860,16 @@ export default function OwnerPage() {
 
                 <Field label="Description">
                   <textarea
-                    value={d.description}
-                    onChange={(e) => setD({ ...d, description: e.target.value })}
+                    value={draft.description}
+                    onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                     rows={6}
                     className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm"
                   />
                 </Field>
                 <Field label="Features (one per line)">
                   <textarea
-                    value={d.featuresText}
-                    onChange={(e) => setD({ ...d, featuresText: e.target.value })}
+                    value={draft.featuresText}
+                    onChange={(e) => setDraft({ ...draft, featuresText: e.target.value })}
                     rows={6}
                     className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm"
                   />
@@ -408,131 +877,129 @@ export default function OwnerPage() {
 
                 <Field label="Agent name">
                   <input
-                    value={d.agentName}
-                    onChange={(e) => setD({ ...d, agentName: e.target.value })}
+                    value={draft.agentName}
+                    onChange={(e) => setDraft({ ...draft, agentName: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Agent phone">
                   <input
-                    value={d.agentPhone}
-                    onChange={(e) => setD({ ...d, agentPhone: e.target.value })}
+                    value={draft.agentPhone}
+                    onChange={(e) => setDraft({ ...draft, agentPhone: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Agent email">
                   <input
-                    value={d.agentEmail}
-                    onChange={(e) => setD({ ...d, agentEmail: e.target.value })}
+                    value={draft.agentEmail}
+                    onChange={(e) => setDraft({ ...draft, agentEmail: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
+
                 <Field label="Open house start (ISO)">
                   <input
-                    value={d.openHouseIso}
-                    onChange={(e) => setD({ ...d, openHouseIso: e.target.value })}
+                    value={draft.openHouseIso}
+                    onChange={(e) => setDraft({ ...draft, openHouseIso: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Latitude">
                   <input
-                    value={d.lat}
-                    onChange={(e) => setD({ ...d, lat: e.target.value })}
+                    value={draft.lat}
+                    onChange={(e) => setDraft({ ...draft, lat: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
                 <Field label="Longitude">
                   <input
-                    value={d.lon}
-                    onChange={(e) => setD({ ...d, lon: e.target.value })}
+                    value={draft.lon}
+                    onChange={(e) => setDraft({ ...draft, lon: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
               </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => downloadText("property.json", json)}
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-ink-950 px-5 text-sm font-semibold text-white"
-                >
-                  Download `property.json`
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await saveToFirebase();
-                      alert("Saved to Firebase.");
-                    } catch (e) {
-                      alert(e instanceof Error ? e.message : "Save failed");
-                    }
-                  }}
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-ink-200 bg-white px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50"
-                >
-                  Save to Firebase
-                </button>
-                <a
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-ink-200 bg-white px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50"
-                  href="/"
-                >
-                  Back to site
-                </a>
-              </div>
             </div>
           </div>
 
-          <div className="lg:col-span-5">
-            <div className="card overflow-hidden">
-              <div className="border-b border-ink-100 px-6 py-4">
-                <p className="text-sm font-semibold text-ink-950">
-                  Output preview
-                </p>
-                <p className="mt-1 text-sm text-ink-600">
-                  Save this to{" "}
-                  <span className="font-mono text-[0.92em]">
-                    content/properties/{d.slug}/property.json
-                  </span>
-                  .
-                </p>
+          <div className="xl:col-span-5">
+            <div className="card p-6">
+              <h2 className="text-base font-semibold text-ink-950">Media Manager</h2>
+              <p className="mt-1 text-sm text-ink-600">
+                Uploaded files live in Storage at <span className="font-mono">listings/{safeSlug(draft.slug) || "<slug>"}/...</span>.
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <UploadRow
+                  label="Upload hero"
+                  hint="Top slideshow images"
+                  onPick={(files) => uploadFiles("hero", files)}
+                />
+                <UploadRow
+                  label="Upload photos"
+                  hint="Gallery images"
+                  onPick={(files) => uploadFiles("photos", files)}
+                />
+                <UploadRow
+                  label="Upload floorplans"
+                  hint="Plans and schematics"
+                  onPick={(files) => uploadFiles("floorplans", files)}
+                />
+                <UploadRow
+                  label="Upload docs"
+                  hint="PDF brochures/disclosures"
+                  accept=".pdf"
+                  onPick={(files) => uploadFiles("docs", files)}
+                />
               </div>
-              <pre className="max-h-[70vh] overflow-auto bg-ink-950 p-5 text-xs text-white/90">
-                {json}
-              </pre>
+
+              <div className="mt-6 grid gap-4">
+                <MediaPanel
+                  title="Hero"
+                  folder="hero"
+                  items={media.hero}
+                  busy={mediaBusy}
+                  onMove={(index, dir) => void moveMediaItem("hero", index, dir)}
+                  onDelete={(item) => void deleteMediaItem("hero", item)}
+                />
+                <MediaPanel
+                  title="Photos"
+                  folder="photos"
+                  items={media.photos}
+                  busy={mediaBusy}
+                  onMove={(index, dir) => void moveMediaItem("photos", index, dir)}
+                  onDelete={(item) => void deleteMediaItem("photos", item)}
+                />
+                <MediaPanel
+                  title="Floorplans"
+                  folder="floorplans"
+                  items={media.floorplans}
+                  busy={mediaBusy}
+                  onMove={(index, dir) => void moveMediaItem("floorplans", index, dir)}
+                  onDelete={(item) => void deleteMediaItem("floorplans", item)}
+                />
+                <MediaPanel
+                  title="Documents"
+                  folder="docs"
+                  items={media.docs}
+                  busy={mediaBusy}
+                  onMove={(index, dir) => void moveMediaItem("docs", index, dir)}
+                  onDelete={(item) => void deleteMediaItem("docs", item)}
+                  onRename={(item, label) => void renameDocument(item, label)}
+                />
+              </div>
             </div>
 
-            <div className="mt-6 card p-6">
-              <p className="text-sm font-semibold text-ink-950">Media folders</p>
-              <ul className="mt-3 grid gap-2 text-sm text-ink-700">
-                <li>
-                  Hero:{" "}
-                  <span className="font-mono text-[0.92em]">
-                    public/listings/{d.slug}/hero/
-                  </span>
-                </li>
-                <li>
-                  Photos:{" "}
-                  <span className="font-mono text-[0.92em]">
-                    public/listings/{d.slug}/photos/
-                  </span>
-                </li>
-                <li>
-                  Floor plans:{" "}
-                  <span className="font-mono text-[0.92em]">
-                    public/listings/{d.slug}/floorplans/
-                  </span>
-                </li>
-                <li>
-                  Docs:{" "}
-                  <span className="font-mono text-[0.92em]">
-                    public/listings/{d.slug}/docs/
-                  </span>
-                </li>
-              </ul>
-              <p className="mt-4 text-sm text-ink-600">
-                Leave `media.photos` empty to auto-discover files from these
-                folders.
-              </p>
+            <div className="mt-6 card overflow-hidden">
+              <div className="border-b border-ink-100 px-6 py-4">
+                <p className="text-sm font-semibold text-ink-950">Firestore payload preview</p>
+                <p className="mt-1 text-sm text-ink-600">
+                  Includes Storage object paths and ordering that survive new builds.
+                </p>
+              </div>
+              <pre className="max-h-[50vh] overflow-auto bg-ink-950 p-5 text-xs text-white/90">
+                {propertyJson}
+              </pre>
             </div>
           </div>
         </div>
@@ -563,27 +1030,23 @@ function UploadRow({
 }) {
   const [status, setStatus] = useState<
     | { state: "idle" }
-    | { state: "picked"; count: number }
     | { state: "uploading"; count: number }
     | { state: "done"; count: number }
     | { state: "error"; message: string }
   >({ state: "idle" });
 
   return (
-    <label className="card flex flex-col justify-between gap-3 p-4">
-      <div>
-        <p className="text-sm font-semibold text-ink-950">{label}</p>
-        <p className="mt-1 text-sm text-ink-600">{hint}</p>
-        {status.state === "picked" ? (
-          <p className="mt-2 text-sm text-ink-700">Selected {status.count} file(s).</p>
-        ) : status.state === "uploading" ? (
-          <p className="mt-2 text-sm text-ink-700">Uploading {status.count} file(s)…</p>
-        ) : status.state === "done" ? (
-          <p className="mt-2 text-sm text-green-700">Uploaded {status.count} file(s).</p>
-        ) : status.state === "error" ? (
-          <p className="mt-2 text-sm text-red-700">{status.message}</p>
-        ) : null}
-      </div>
+    <label className="rounded-xl border border-ink-200 bg-ink-50/70 p-3">
+      <p className="text-sm font-semibold text-ink-950">{label}</p>
+      <p className="mt-1 text-xs text-ink-600">{hint}</p>
+      {status.state === "uploading" ? (
+        <p className="mt-2 text-xs text-ink-700">Uploading {status.count} file(s)...</p>
+      ) : status.state === "done" ? (
+        <p className="mt-2 text-xs text-green-700">Uploaded {status.count} file(s).</p>
+      ) : status.state === "error" ? (
+        <p className="mt-2 text-xs text-red-700">{status.message}</p>
+      ) : null}
+
       <input
         type="file"
         multiple
@@ -594,23 +1057,112 @@ function UploadRow({
           const files = input.files;
           if (!files || files.length === 0) return;
 
-          setStatus({ state: "picked", count: files.length });
+          setStatus({ state: "uploading", count: files.length });
           try {
-            setStatus({ state: "uploading", count: files.length });
             await onPick(files);
             setStatus({ state: "done", count: files.length });
           } catch (err) {
             setStatus({
               state: "error",
-              message: err instanceof Error ? err.message : "Upload failed."
+              message: err instanceof Error ? err.message : "Upload failed"
             });
           } finally {
-            // Clear so picking the same file again triggers onChange.
             input.value = "";
           }
         }}
-        className="block w-full text-sm text-ink-700 file:mr-3 file:rounded-lg file:border file:border-ink-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink-900 hover:file:bg-ink-50"
+        className="mt-3 block w-full text-sm text-ink-700 file:mr-3 file:rounded-lg file:border file:border-ink-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink-900 hover:file:bg-ink-50"
       />
     </label>
+  );
+}
+
+function MediaPanel({
+  title,
+  folder,
+  items,
+  busy,
+  onMove,
+  onDelete,
+  onRename
+}: {
+  title: string;
+  folder: MediaFolder;
+  items: OwnerMediaItem[];
+  busy: boolean;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onDelete: (item: OwnerMediaItem) => void;
+  onRename?: (item: OwnerMediaItem, label: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-ink-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-ink-950">{title}</p>
+        <span className="rounded-full bg-ink-100 px-2 py-1 text-xs text-ink-700">
+          {items.length}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-600">No files yet.</p>
+      ) : (
+        <ul className="mt-3 grid gap-3">
+          {items.map((item, index) => (
+            <li key={item.objectPath} className="rounded-xl border border-ink-100 p-3">
+              {isImageItem(item) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.signedUrl}
+                  alt={item.name}
+                  className="h-24 w-full rounded-lg object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex h-24 w-full items-center justify-center rounded-lg bg-ink-50 text-sm text-ink-600">
+                  File
+                </div>
+              )}
+
+              <p className="mt-2 truncate text-sm font-medium text-ink-900">{item.name}</p>
+              <p className="truncate text-xs text-ink-600">{item.objectPath}</p>
+
+              {folder === "docs" && onRename ? (
+                <input
+                  defaultValue={item.label || item.name}
+                  onBlur={(e) => onRename(item, e.target.value)}
+                  className="mt-2 h-9 w-full rounded-lg border border-ink-200 px-2 text-xs"
+                />
+              ) : null}
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onMove(index, -1)}
+                  disabled={busy || index === 0}
+                  className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
+                >
+                  Up
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMove(index, 1)}
+                  disabled={busy || index === items.length - 1}
+                  className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
+                >
+                  Down
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(item)}
+                  disabled={busy}
+                  className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-40"
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
