@@ -214,15 +214,7 @@ export default function OwnerPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             Update listing content
           </h1>
-          <p className="mt-3 max-w-2xl text-sm text-ink-700">
-            Fill out fields and download a ready-to-drop{" "}
-            <span className="font-mono text-[0.92em]">property.json</span>. Then
-            place media in{" "}
-            <span className="font-mono text-[0.92em]">
-              public/listings/&lt;slug&gt;/
-            </span>
-            .
-          </p>
+          {/* Helper paragraph removed per user request */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             {authState.status === "ready" ? (
               <>
