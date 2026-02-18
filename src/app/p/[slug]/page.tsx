@@ -6,7 +6,6 @@ import { HeroKenBurns } from "@/components/hero-kenburns";
 import { StickyNav, type StickyNavItem } from "@/components/sticky-nav";
 import { Section } from "@/components/section";
 import { ExpandableText } from "@/components/expandable-text";
-import { FeatureGrid } from "@/components/feature-grid";
 import { Gallery } from "@/components/gallery";
 import { VideoEmbed } from "@/components/video-embed";
 import { AgentCard } from "@/components/agent-card";
@@ -50,6 +49,12 @@ export default async function PropertyPage({
   const hasVideo = Boolean(property.media?.video?.embedUrl || property.media?.video?.mp4Url);
   const hasMap = Boolean(property.location);
   const hasGoogleKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+  const overviewBackdrop =
+    photos.find((src) => /DJI_0868\.png/i.test(src)) ||
+    heroImages.find((src) => /DJI_0868\.png/i.test(src)) ||
+    photos[0] ||
+    heroImages[0] ||
+    "/placeholders/hero.svg";
 
   const nav: StickyNavItem[] = [
     { id: "overview", label: "Overview" },
@@ -71,57 +76,77 @@ export default async function PropertyPage({
       <StickyNav items={nav} />
       <DetailsBar property={property} />
 
-      <Section
-        id="overview"
-        title="Overview"
-        subtitle={property.headline ?? "Key details, story, and open house info."}
-      >
-        <div className="mt-6 grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-8">
-            <div className="card p-6">
-              <h3 className="text-base font-semibold text-ink-950">Description</h3>
-              <div className="mt-3">
-                <ExpandableText text={property.description} />
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-4">
-            {property.openHouses && property.openHouses.length > 0 ? (
-              <div className="card p-6">
-                <h3 className="text-base font-semibold text-ink-950">
-                  Open house
-                </h3>
-                <ul className="mt-3 grid gap-2 text-sm text-ink-800">
-                  {property.openHouses.map((oh) => (
-                    <li key={oh.startIso} className="rounded-xl bg-ink-50 px-3 py-2">
-                      <p className="font-medium">{formatOpenHouse(oh)}</p>
-                      {oh.note ? (
-                        <p className="mt-1 text-ink-600">{oh.note}</p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="card p-6">
-                <h3 className="text-base font-semibold text-ink-950">
-                  Schedule a tour
-                </h3>
-                <p className="mt-2 text-sm text-ink-700">
-                  Contact the agent below to arrange a private showing.
+      <section className="relative py-10 sm:py-12">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url("${overviewBackdrop}")` }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-black/60" aria-hidden="true" />
+        <div className="relative container-page">
+          <section id="overview" className="py-6">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white">Overview</h2>
+                <p className="mt-1 text-sm text-white/85">
+                  {property.headline ?? "Key details, story, and open house info."}
                 </p>
               </div>
-            )}
-          </div>
-        </div>
-      </Section>
+            </div>
+            <div className="mt-6 grid gap-8 lg:grid-cols-12">
+              <div className="lg:col-span-8">
+                <h3 className="text-base font-semibold text-white">Description</h3>
+                <div className="mt-3">
+                  <ExpandableText text={property.description} tone="light" />
+                </div>
+              </div>
 
-      {property.features && property.features.length > 0 ? (
-        <Section id="features" title="Feature highlights">
-          <FeatureGrid features={property.features} />
-        </Section>
-      ) : null}
+              <div className="lg:col-span-4">
+                {property.openHouses && property.openHouses.length > 0 ? (
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Open house</h3>
+                    <ul className="mt-3 grid gap-3 text-sm text-white/90">
+                      {property.openHouses.map((oh) => (
+                        <li key={oh.startIso} className="border-t border-white/25 pt-3">
+                          <p className="font-medium">{formatOpenHouse(oh)}</p>
+                          {oh.note ? <p className="mt-1 text-white/80">{oh.note}</p> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Schedule a tour</h3>
+                    <p className="mt-2 text-sm text-white/85">
+                      Contact the agent below to arrange a private showing.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {property.features && property.features.length > 0 ? (
+            <section id="features" className="py-6">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-white">
+                    Feature highlights
+                  </h2>
+                </div>
+              </div>
+              <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {property.features.map((feature) => (
+                  <li key={feature} className="flex gap-3 text-white/90">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-white" />
+                    <span className="text-sm">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
+      </section>
 
       {photos.length > 0 ? (
         <Section

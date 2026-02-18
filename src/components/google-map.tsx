@@ -26,7 +26,10 @@ export function GoogleMap({
 }: GoogleMapProps) {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [ready, setReady] = useState(false);
+  const [interactive, setInteractive] = useState(false);
+  const [hovering, setHovering] = useState(false);
   const mapRef = useRef<unknown>(null);
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const src = useMemo(() => {
     if (!key) return null;
@@ -53,11 +56,12 @@ export function GoogleMap({
       streetViewControl: true,
       mapTypeControl: true,
       fullscreenControl: true,
-      zoomControl: true,
+      zoomControl: interactive,
       scaleControl: true,
       rotateControl: true,
-      scrollwheel: true,
-      draggable: true
+      scrollwheel: interactive,
+      draggable: interactive,
+      gestureHandling: interactive ? "greedy" : "none"
     });
 
     new g.maps.Marker({
@@ -67,7 +71,45 @@ export function GoogleMap({
     });
 
     mapRef.current = map;
-  }, [lat, lon, mapElementId, mapStyle, mapTypeId, markerTitle, ready, zoom]);
+  }, [interactive, lat, lon, mapElementId, mapStyle, mapTypeId, markerTitle, ready, zoom]);
+
+  useEffect(() => {
+    const g = (window as unknown as { google?: any }).google;
+    if (!g?.maps) return;
+    const map = mapRef.current as any;
+    if (!map?.setOptions) return;
+    map.setOptions({
+      zoomControl: interactive,
+      scrollwheel: interactive,
+      draggable: interactive,
+      gestureHandling: interactive ? "greedy" : "none"
+    });
+  }, [interactive]);
+
+  useEffect(() => {
+    return () => {
+      if (unlockTimerRef.current) {
+        clearTimeout(unlockTimerRef.current);
+        unlockTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  function clearUnlockTimer() {
+    if (unlockTimerRef.current) {
+      clearTimeout(unlockTimerRef.current);
+      unlockTimerRef.current = null;
+    }
+  }
+
+  function startHoverUnlockTimer() {
+    if (interactive || unlockTimerRef.current) return;
+    unlockTimerRef.current = setTimeout(() => {
+      setInteractive(true);
+      setHovering(false);
+      unlockTimerRef.current = null;
+    }, 1000);
+  }
 
   if (!src) {
     return (
@@ -94,10 +136,44 @@ export function GoogleMap({
   return (
     <>
       <Script src={src} strategy="afterInteractive" onLoad={() => setReady(true)} />
-      <div
-        id={mapElementId}
-        style={{ width: "100%", height: `${heightPx}px`, position: "relative", overflow: "hidden" }}
-      />
+      <div className="relative" style={{ width: "100%", height: `${heightPx}px`, overflow: "hidden" }}>
+        <div
+          id={mapElementId}
+          className={interactive ? "" : "grayscale"}
+          style={{ width: "100%", height: `${heightPx}px` }}
+        />
+        {!interactive ? (
+          <button
+            type="button"
+            onClick={() => {
+              clearUnlockTimer();
+              setInteractive(true);
+            }}
+            onMouseEnter={() => {
+              setHovering(true);
+              startHoverUnlockTimer();
+            }}
+            onMouseLeave={() => {
+              setHovering(false);
+              clearUnlockTimer();
+            }}
+            onTouchStart={() => {
+              setHovering(true);
+            }}
+            onTouchEnd={() => {
+              setHovering(false);
+            }}
+            className="absolute inset-0 z-10 flex w-full items-center justify-center bg-black/25 text-center text-white"
+            aria-label="Enable map interactions"
+          >
+            <span className="rounded-xl bg-black/55 px-4 py-3 text-sm font-medium">
+              {hovering
+                ? "Hold for 1 second to enable map"
+                : "Map locked while scrolling. Tap to enable."}
+            </span>
+          </button>
+        ) : null}
+      </div>
     </>
   );
 }
