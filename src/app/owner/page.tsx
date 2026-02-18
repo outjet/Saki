@@ -526,34 +526,24 @@ export default function OwnerPage() {
     setMediaBusy(true);
     try {
       for (const file of Array.from(files)) {
-        const signRes = await fetch("/api/admin/upload-url", {
+        const form = new FormData();
+        form.set("slug", slug);
+        form.set("folder", folder);
+        form.set("file", file, file.name);
+
+        const uploadRes = await fetch("/api/admin/upload", {
           method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            slug,
-            folder,
-            filename: file.name,
-            contentType: file.type || "application/octet-stream"
-          })
+          headers: { authorization: `Bearer ${token}` },
+          body: form
         });
 
-        const signBody = await readResponse<{ ok?: boolean; error?: string; signedUrl?: string }>(
-          signRes
+        const uploadBody = await readResponse<{ ok?: boolean; error?: string }>(
+          uploadRes
         );
-        if (!signRes.ok || !signBody.data?.ok || !signBody.data.signedUrl) {
+        if (!uploadRes.ok || !uploadBody.data?.ok) {
           throw new Error(
-            signBody.data?.error || signBody.raw || "Failed to create upload URL"
+            uploadBody.data?.error || uploadBody.raw || "Upload failed"
           );
-        }
-
-        const putRes = await fetch(signBody.data.signedUrl, {
-          method: "PUT",
-          headers: { "content-type": file.type || "application/octet-stream" },
-          body: file
-        });
-
-        if (!putRes.ok) {
-          throw new Error(`Upload failed for ${file.name}`);
         }
       }
 
@@ -711,8 +701,7 @@ export default function OwnerPage() {
             Listing Studio
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-ink-700">
-            Bucket-first media management with Firestore-backed listing data. Upload, preview,
-            reorder, and delete assets without touching repo files.
+            Manage listing details, photos, and documents.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -766,7 +755,7 @@ export default function OwnerPage() {
             <div className="card p-6">
               <h2 className="text-base font-semibold text-ink-950">Listing Details</h2>
               <p className="mt-1 text-sm text-ink-600">
-                This data persists in Firestore and remains intact across deployments.
+                Update the property information below.
               </p>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
