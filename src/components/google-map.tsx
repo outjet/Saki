@@ -191,7 +191,7 @@ export function GoogleMap({
       <div className="relative" style={{ width: "100%", height: `${heightPx}px`, overflow: "hidden" }}>
         <div
           id={mapElementId}
-          className={interactive ? "" : "grayscale"}
+          className={interactive ? "" : "grayscale opacity-90"}
           style={{ width: "100%", height: `${heightPx}px` }}
         />
         {!interactive ? (
@@ -207,10 +207,10 @@ export function GoogleMap({
             onMouseLeave={() => {
               clearUnlockTimer();
             }}
-            className="absolute inset-0 z-10 flex w-full items-center justify-center bg-black/25 text-center text-white"
+            className="absolute inset-0 z-10 flex w-full items-center justify-center bg-black/10 text-center text-white"
             aria-label="Enable map interactions"
           >
-            <span className="rounded-xl bg-black/55 px-4 py-3 text-sm font-medium">
+            <span className="rounded-xl bg-black/45 px-4 py-3 text-sm font-medium">
               Tap to interact with map
             </span>
           </button>
