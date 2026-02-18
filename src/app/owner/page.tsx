@@ -849,9 +849,8 @@ export default function OwnerPage() {
       </header>
 
       <section className="container-page py-10">
-        <div className="grid gap-6 xl:grid-cols-12">
-          <div className="xl:col-span-7">
-            <div className="card p-6">
+        <div className="grid gap-6">
+          <div className="card p-6">
               <h2 className="text-base font-semibold text-ink-950">Listing Details</h2>
               <p className="mt-1 text-sm text-ink-600">
                 Update the property information below.
@@ -1007,11 +1006,9 @@ export default function OwnerPage() {
                   />
                 </Field>
               </div>
-            </div>
           </div>
 
-          <div className="xl:col-span-5">
-            <div className="card p-6">
+          <div className="card p-6">
               <h2 className="text-base font-semibold text-ink-950">Media Manager</h2>
               <p className="mt-1 text-sm text-ink-600">
                 Upload and arrange your listing media.
@@ -1103,19 +1100,18 @@ export default function OwnerPage() {
                   onRename={(item, label) => void renameDocument(item, label)}
                 />
               </div>
-            </div>
+          </div>
 
-            <div className="mt-6 card overflow-hidden">
-              <div className="border-b border-ink-100 px-6 py-4">
-                <p className="text-sm font-semibold text-ink-950">Firestore payload preview</p>
-                <p className="mt-1 text-sm text-ink-600">
-                  Preview of what will be saved.
-                </p>
-              </div>
-              <pre className="max-h-[50vh] overflow-auto bg-ink-950 p-5 text-xs text-white/90">
-                {propertyJson}
-              </pre>
+          <div className="card overflow-hidden">
+            <div className="border-b border-ink-100 px-6 py-4">
+              <p className="text-sm font-semibold text-ink-950">Firestore payload preview</p>
+              <p className="mt-1 text-sm text-ink-600">
+                Preview of what will be saved.
+              </p>
             </div>
+            <pre className="max-h-[50vh] overflow-auto bg-ink-950 p-5 text-xs text-white/90">
+              {propertyJson}
+            </pre>
           </div>
         </div>
       </section>

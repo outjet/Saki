@@ -8,7 +8,6 @@ import { Section } from "@/components/section";
 import { ExpandableText } from "@/components/expandable-text";
 import { Gallery } from "@/components/gallery";
 import { VideoEmbed } from "@/components/video-embed";
-import { AgentCard } from "@/components/agent-card";
 import { InquiryForm } from "@/components/inquiry-form";
 import { GoogleMap } from "@/components/google-map";
 import { DetailsBar } from "@/components/details-bar";
@@ -284,9 +283,8 @@ export default async function PropertyPage({
             <source src={contactVideo} />
           </video>
         ) : null}
-        <div className="absolute inset-0 bg-black/65" aria-hidden="true" />
         <div className="relative container-page">
-          <div className="rounded-3xl border border-white/20 bg-slate-700/35 p-6 backdrop-blur-sm sm:p-8">
+          <div className="rounded-3xl border border-white/20 bg-slate-700/35 p-6 sm:p-8">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
@@ -295,21 +293,8 @@ export default async function PropertyPage({
                 </p>
               </div>
             </div>
-            <div className="mt-6 grid gap-6 lg:grid-cols-12">
-              <div className="lg:col-span-4">
-                {property.agent ? (
-                  <AgentCard agent={property.agent} tone="dark" />
-                ) : (
-                  <div className="rounded-2xl border border-white/20 bg-black/20 p-6">
-                    <p className="text-sm font-semibold text-white">Seller</p>
-                    <p className="mt-2 text-sm text-white/80">
-                      Add agent/seller details in{" "}
-                      <span className="font-mono text-[0.92em]">property.json</span>.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="lg:col-span-8">
+            <div className="mt-6">
+              <div className="mx-auto max-w-3xl">
                 <InquiryForm propertySlug={property.slug} tone="dark" />
               </div>
             </div>

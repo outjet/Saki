@@ -28,8 +28,9 @@ export function InquiryForm({
       const name = String(formData.get("name") ?? "");
       const email = String(formData.get("email") ?? "");
       const phone = String(formData.get("phone") ?? "");
-      if (!name || !email || !phone) {
-        throw new Error("Name, email, and phone are required.");
+      const message = String(formData.get("message") ?? "");
+      if (!name || !email || !phone || !message.trim()) {
+        throw new Error("Name, email, phone, and message are required.");
       }
       formData.set("propertySlug", propertySlug);
       formData.set("source", "listing-contact");
@@ -81,7 +82,7 @@ export function InquiryForm({
     >
       <div className="mb-4">
         <p className={isDark ? "text-base font-semibold text-white" : "text-base font-semibold text-ink-950"}>
-          Contact us
+          Send a message
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -126,6 +127,20 @@ export function InquiryForm({
           />
         </label>
         <div className="hidden sm:block" />
+        <label className={isDark ? "grid gap-2 text-sm font-medium text-white sm:col-span-2" : "grid gap-2 text-sm font-medium text-ink-900 sm:col-span-2"}>
+          Message
+          <textarea
+            name="message"
+            required
+            rows={4}
+            className={
+              isDark
+                ? "rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/70 focus:border-white/60"
+                : "rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-ink-400"
+            }
+            placeholder="How can we help?"
+          />
+        </label>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
