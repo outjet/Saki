@@ -290,7 +290,7 @@ export default async function PropertyPage({
 
       <footer className="border-t border-ink-100">
         <div className="container-page py-10 text-sm text-ink-600">
-          <p>© {new Date().getFullYear()} Saki. Demo content.</p>
+          <p>© {new Date().getFullYear()} outjet productions</p>
         </div>
       </footer>
     </main>

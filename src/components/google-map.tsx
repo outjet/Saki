@@ -27,9 +27,9 @@ export function GoogleMap({
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [ready, setReady] = useState(false);
   const [interactive, setInteractive] = useState(false);
-  const [hovering, setHovering] = useState(false);
   const mapRef = useRef<unknown>(null);
   const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverUnlockDelayMs = 2000;
 
   const src = useMemo(() => {
     if (!key) return null;
@@ -59,7 +59,7 @@ export function GoogleMap({
       zoomControl: interactive,
       scaleControl: true,
       rotateControl: true,
-      scrollwheel: interactive,
+      scrollwheel: false,
       draggable: interactive,
       gestureHandling: interactive ? "greedy" : "none"
     });
@@ -80,7 +80,7 @@ export function GoogleMap({
     if (!map?.setOptions) return;
     map.setOptions({
       zoomControl: interactive,
-      scrollwheel: interactive,
+      scrollwheel: false,
       draggable: interactive,
       gestureHandling: interactive ? "greedy" : "none"
     });
@@ -106,9 +106,8 @@ export function GoogleMap({
     if (interactive || unlockTimerRef.current) return;
     unlockTimerRef.current = setTimeout(() => {
       setInteractive(true);
-      setHovering(false);
       unlockTimerRef.current = null;
-    }, 1000);
+    }, hoverUnlockDelayMs);
   }
 
   if (!src) {
@@ -150,26 +149,16 @@ export function GoogleMap({
               setInteractive(true);
             }}
             onMouseEnter={() => {
-              setHovering(true);
               startHoverUnlockTimer();
             }}
             onMouseLeave={() => {
-              setHovering(false);
               clearUnlockTimer();
-            }}
-            onTouchStart={() => {
-              setHovering(true);
-            }}
-            onTouchEnd={() => {
-              setHovering(false);
             }}
             className="absolute inset-0 z-10 flex w-full items-center justify-center bg-black/25 text-center text-white"
             aria-label="Enable map interactions"
           >
             <span className="rounded-xl bg-black/55 px-4 py-3 text-sm font-medium">
-              {hovering
-                ? "Hold for 1 second to enable map"
-                : "Map locked while scrolling. Tap to enable."}
+              Tap to interact with map
             </span>
           </button>
         ) : null}
