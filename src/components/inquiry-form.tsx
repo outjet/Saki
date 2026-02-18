@@ -90,6 +90,7 @@ export function InquiryForm({
           Name
           <input
             name="name"
+            autoComplete="name"
             required
             className={
               isDark
@@ -104,6 +105,7 @@ export function InquiryForm({
           <input
             name="email"
             type="email"
+            autoComplete="email"
             required
             className={
               isDark
@@ -117,13 +119,16 @@ export function InquiryForm({
           Phone
           <input
             name="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             required
             className={
               isDark
                 ? "h-11 rounded-xl border border-white/30 bg-white/10 px-3 text-sm text-white outline-none placeholder:text-white/70 focus:border-white/60"
                 : "h-11 rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-ink-400"
             }
-            placeholder="(555) 555-5555"
+            placeholder="(440) 123-1234"
           />
         </label>
         <div className="hidden sm:block" />
@@ -131,6 +136,7 @@ export function InquiryForm({
           Message
           <textarea
             name="message"
+            autoComplete="off"
             required
             rows={4}
             className={

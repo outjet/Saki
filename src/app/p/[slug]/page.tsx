@@ -154,7 +154,6 @@ export default async function PropertyPage({
         <Section
           id="photos"
           title="Photos"
-          subtitle="Click any photo to view full-screen."
         >
           <Gallery images={photos} columns={3} label="Photos" />
         </Section>
@@ -289,7 +288,7 @@ export default async function PropertyPage({
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
                 <p className="mt-1 text-sm text-white/85">
-                  Reach out to ask questions or request a showing.
+                  Please reach out with any questions.
                 </p>
               </div>
             </div>

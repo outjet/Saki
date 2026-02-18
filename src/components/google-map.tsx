@@ -33,7 +33,12 @@ export function GoogleMap({
 
   const src = useMemo(() => {
     if (!key) return null;
-    const params = new URLSearchParams({ v: "3", key });
+    const params = new URLSearchParams({
+      v: "3",
+      key,
+      loading: "async",
+      libraries: "marker"
+    });
     return `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
   }, [key]);
 
@@ -64,11 +69,19 @@ export function GoogleMap({
       gestureHandling: interactive ? "greedy" : "none"
     });
 
-    new g.maps.Marker({
-      position: center,
-      map,
-      title: markerTitle
-    });
+    if (g.maps.marker?.AdvancedMarkerElement) {
+      new g.maps.marker.AdvancedMarkerElement({
+        position: center,
+        map,
+        title: markerTitle
+      });
+    } else {
+      new g.maps.Marker({
+        position: center,
+        map,
+        title: markerTitle
+      });
+    }
 
     mapRef.current = map;
   }, [interactive, lat, lon, mapElementId, mapStyle, mapTypeId, markerTitle, ready, zoom]);
