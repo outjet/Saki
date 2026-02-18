@@ -109,7 +109,7 @@ export function InquiryForm({ propertySlug }: { propertySlug: string }) {
           <p className="text-sm text-red-700">{state.message}</p>
         ) : (
           <p className="text-sm text-ink-600">
-            Submissions are logged server-side in this demo.
+          
           </p>
         )}
       </div>

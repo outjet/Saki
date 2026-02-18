@@ -89,29 +89,31 @@ type LoadedProperty = {
   };
 };
 
-const initialDraft: Draft = {
-  slug: "23760-emmons-road",
-  street: "23760 Emmons Road",
-  city: "Columbia Station",
-  state: "OH",
-  zip: "44028",
-  price: 650000,
-  beds: 4,
-  baths: 3,
-  homeSqft: 2750,
-  lotAcres: 2.84,
-  headline: "Modern comfort on a private 2.84-acre setting.",
-  description:
-    "Introducing 23760 Emmons Road, a stunning property located in Columbia Station, OH. This home offers comfort, privacy, and room to roam. Oversized windows fill the interior with natural light, and thoughtful finishes bring a warm, inviting feel throughout.",
-  featuresText:
-    "Hardwood floors\nOversized windows\nLarge lot\nPrivate setting\nUpdated kitchen\nThree-car garage",
-  agentName: "",
-  agentPhone: "",
-  agentEmail: "",
-  openHouseIso: "",
-  lat: "",
-  lon: ""
-};
+function blankDraft(slug = "23760-emmons-road"): Draft {
+  return {
+    slug,
+    street: "",
+    city: "",
+    state: "",
+    zip: "",
+    price: 0,
+    beds: 0,
+    baths: 0,
+    homeSqft: 0,
+    lotAcres: 0,
+    headline: "",
+    description: "",
+    featuresText: "",
+    agentName: "",
+    agentPhone: "",
+    agentEmail: "",
+    openHouseIso: "",
+    lat: "",
+    lon: ""
+  };
+}
+
+const initialDraft: Draft = blankDraft();
 
 const emptyMediaState: OwnerMediaState = {
   hero: [],
@@ -210,6 +212,7 @@ export default function OwnerPage() {
   const [mediaBusy, setMediaBusy] = useState(false);
   const [loadingListing, setLoadingListing] = useState(false);
   const [savingListing, setSavingListing] = useState(false);
+  const [autoLoadedSlug, setAutoLoadedSlug] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
   const [mediaExtras, setMediaExtras] = useState<PropertyMediaExtras>({
     video: { title: "Property video", embedUrl: "" },
@@ -282,6 +285,7 @@ export default function OwnerPage() {
   async function doSignOut() {
     await signOut(firebaseAuth());
     setAuthState({ status: "signed_out" });
+    setAutoLoadedSlug(null);
     setMedia(emptyMediaState);
     setMediaDirty(false);
     setStatusMessage("");
@@ -293,6 +297,7 @@ export default function OwnerPage() {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setAuthState({ status: "signed_out" });
+        setAutoLoadedSlug(null);
         setMedia(emptyMediaState);
         setMediaDirty(false);
         return;
@@ -347,6 +352,47 @@ export default function OwnerPage() {
     };
   }
 
+  const loadListingWithToken = useCallback(
+    async (token: string, slug: string, showMessage = true) => {
+      if (!slug) {
+        setStatusMessage("Set a slug first.");
+        return;
+      }
+      setLoadingListing(true);
+      try {
+        const res = await fetch(`/api/admin/property?slug=${encodeURIComponent(slug)}`, {
+          headers: { authorization: `Bearer ${token}` }
+        });
+        const { data, raw } = await readResponse<{
+          ok?: boolean;
+          property?: LoadedProperty | null;
+          error?: string;
+        }>(res);
+
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || raw || "Failed to load listing");
+        }
+
+        if (data.property) {
+          setDraft(draftFromProperty(data.property as LoadedProperty, blankDraft(slug)));
+          setMediaExtras({
+            video: data.property.media?.video,
+            tours: data.property.media?.tours || []
+          });
+          if (showMessage) setStatusMessage("Loaded listing from Firestore.");
+        } else if (showMessage) {
+          setDraft(blankDraft(slug));
+          setStatusMessage("No Firestore listing found for this slug yet.");
+        }
+      } catch (e) {
+        setStatusMessage(e instanceof Error ? e.message : "Failed to load listing");
+      } finally {
+        setLoadingListing(false);
+      }
+    },
+    []
+  );
+
   async function loadListing(showMessage = true) {
     const token = await getToken();
     if (!token) return;
@@ -355,35 +401,7 @@ export default function OwnerPage() {
       setStatusMessage("Set a slug first.");
       return;
     }
-
-    setLoadingListing(true);
-    try {
-      const res = await fetch(`/api/admin/property?slug=${encodeURIComponent(slug)}`, {
-        headers: { authorization: `Bearer ${token}` }
-      });
-      const { data, raw } = await readResponse<{ ok?: boolean; property?: LoadedProperty | null; error?: string }>(
-        res
-      );
-
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || raw || "Failed to load listing");
-      }
-
-      if (data.property) {
-        setDraft((prev) => draftFromProperty(data.property as LoadedProperty, prev));
-        setMediaExtras({
-          video: data.property.media?.video,
-          tours: data.property.media?.tours || []
-        });
-        if (showMessage) setStatusMessage("Loaded listing from Firestore.");
-      } else if (showMessage) {
-        setStatusMessage("No Firestore listing found for this slug yet.");
-      }
-    } catch (e) {
-      setStatusMessage(e instanceof Error ? e.message : "Failed to load listing");
-    } finally {
-      setLoadingListing(false);
-    }
+    await loadListingWithToken(token, slug, showMessage);
   }
 
   async function loadMedia(showMessage = false) {
@@ -668,6 +686,15 @@ export default function OwnerPage() {
     }, 220);
     return () => clearTimeout(timer);
   }, [readyToken, normalizedSlug, loadMediaWithToken]);
+
+  useEffect(() => {
+    if (!readyToken || !normalizedSlug || autoLoadedSlug === normalizedSlug) return;
+    const timer = setTimeout(() => {
+      void loadListingWithToken(readyToken, normalizedSlug, false);
+      setAutoLoadedSlug(normalizedSlug);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [autoLoadedSlug, loadListingWithToken, normalizedSlug, readyToken]);
 
   if (authState.status !== "ready") {
     return (
