@@ -45,45 +45,70 @@ export function GoogleMap({
   useEffect(() => {
     if (!ready) return;
     if (typeof window === "undefined") return;
-    const g = (window as unknown as { google?: any }).google;
-    if (!g?.maps) return;
+    let cancelled = false;
 
-    const el = document.getElementById(mapElementId);
-    if (!el) return;
-    if (mapRef.current) return;
+    void (async () => {
+      const g = (window as unknown as { google?: any }).google;
+      if (!g?.maps) return;
 
-    const center = { lat, lng: lon };
-    const map = new g.maps.Map(el, {
-      center,
-      zoom,
-      mapTypeId,
-      styles: mapStyle as any,
-      streetViewControl: true,
-      mapTypeControl: true,
-      fullscreenControl: true,
-      zoomControl: interactive,
-      scaleControl: true,
-      rotateControl: true,
-      scrollwheel: false,
-      draggable: interactive,
-      gestureHandling: interactive ? "greedy" : "none"
-    });
+      const el = document.getElementById(mapElementId);
+      if (!el) return;
+      if (mapRef.current) return;
 
-    if (g.maps.marker?.AdvancedMarkerElement) {
-      new g.maps.marker.AdvancedMarkerElement({
-        position: center,
-        map,
-        title: markerTitle
+      const center = { lat, lng: lon };
+
+      const mapsLib = g.maps.importLibrary
+        ? await g.maps.importLibrary("maps").catch(() => null)
+        : null;
+      if (cancelled) return;
+
+      const MapCtor = (mapsLib as any)?.Map ?? g.maps.Map;
+      if (typeof MapCtor !== "function") return;
+
+      const map = new MapCtor(el, {
+        center,
+        zoom,
+        mapTypeId,
+        styles: mapStyle as any,
+        streetViewControl: true,
+        mapTypeControl: true,
+        fullscreenControl: true,
+        zoomControl: interactive,
+        scaleControl: true,
+        rotateControl: true,
+        scrollwheel: false,
+        draggable: interactive,
+        gestureHandling: interactive ? "greedy" : "none"
       });
-    } else {
-      new g.maps.Marker({
-        position: center,
-        map,
-        title: markerTitle
-      });
-    }
 
-    mapRef.current = map;
+      const markerLib = g.maps.importLibrary
+        ? await g.maps.importLibrary("marker").catch(() => null)
+        : null;
+      if (cancelled) return;
+
+      const AdvancedMarkerElement =
+        (markerLib as any)?.AdvancedMarkerElement ?? g.maps.marker?.AdvancedMarkerElement;
+
+      if (typeof AdvancedMarkerElement === "function") {
+        new AdvancedMarkerElement({
+          position: center,
+          map,
+          title: markerTitle
+        });
+      } else if (typeof g.maps.Marker === "function") {
+        new g.maps.Marker({
+          position: center,
+          map,
+          title: markerTitle
+        });
+      }
+
+      mapRef.current = map;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [interactive, lat, lon, mapElementId, mapStyle, mapTypeId, markerTitle, ready, zoom]);
 
   useEffect(() => {
