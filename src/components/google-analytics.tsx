@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 declare global {
@@ -17,7 +17,6 @@ export function GoogleAnalytics({
   measurementId?: string;
 }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const lastTrackedPathRef = useRef<string>("");
   const lastTrackedPropertyRef = useRef<string>("");
 
@@ -25,8 +24,7 @@ export function GoogleAnalytics({
     if (!measurementId) return;
     if (typeof window === "undefined") return;
 
-    const query = searchParams.toString();
-    const pagePath = query ? `${pathname}?${query}` : pathname;
+    const pagePath = pathname;
     if (lastTrackedPathRef.current === pagePath) return;
     const sendTracking = () => {
       if (typeof window.gtag !== "function") return false;
@@ -59,7 +57,7 @@ export function GoogleAnalytics({
       void sendTracking();
     }, 350);
     return () => window.clearTimeout(retry);
-  }, [measurementId, pathname, searchParams]);
+  }, [measurementId, pathname]);
 
   if (!measurementId) return null;
 
