@@ -19,6 +19,10 @@ env:
   - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     secret: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
+  # Public Map ID (Cloud Map Styling) for Advanced Markers.
+  - variable: NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
+    secret: NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
+
   # Public Formspree endpoint for contact form submissions.
   - variable: NEXT_PUBLIC_FORMSPREE_ENDPOINT
     value: "https://formspree.io/f/mykdpdkz"

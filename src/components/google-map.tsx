@@ -11,6 +11,7 @@ type GoogleMapProps = {
   mapTypeId?: "roadmap" | "satellite" | "hybrid" | "terrain";
   mapStyle?: unknown;
   markerTitle?: string;
+  mapId?: string;
   mapElementId: string;
 };
 
@@ -22,9 +23,11 @@ export function GoogleMap({
   mapTypeId = "satellite",
   mapStyle,
   markerTitle,
+  mapId,
   mapElementId
 }: GoogleMapProps) {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const effectiveMapId = mapId ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [ready, setReady] = useState(false);
   const [interactive, setInteractive] = useState(false);
   const mapRef = useRef<unknown>(null);
@@ -70,6 +73,7 @@ export function GoogleMap({
         zoom,
         mapTypeId,
         styles: mapStyle as any,
+        ...(effectiveMapId ? { mapId: effectiveMapId } : {}),
         streetViewControl: true,
         mapTypeControl: true,
         fullscreenControl: true,
@@ -89,7 +93,7 @@ export function GoogleMap({
       const AdvancedMarkerElement =
         (markerLib as any)?.AdvancedMarkerElement ?? g.maps.marker?.AdvancedMarkerElement;
 
-      if (typeof AdvancedMarkerElement === "function") {
+      if (effectiveMapId && typeof AdvancedMarkerElement === "function") {
         new AdvancedMarkerElement({
           position: center,
           map,
@@ -109,7 +113,18 @@ export function GoogleMap({
     return () => {
       cancelled = true;
     };
-  }, [interactive, lat, lon, mapElementId, mapStyle, mapTypeId, markerTitle, ready, zoom]);
+  }, [
+    effectiveMapId,
+    interactive,
+    lat,
+    lon,
+    mapElementId,
+    mapStyle,
+    mapTypeId,
+    markerTitle,
+    ready,
+    zoom
+  ]);
 
   useEffect(() => {
     const g = (window as unknown as { google?: any }).google;

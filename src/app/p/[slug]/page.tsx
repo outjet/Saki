@@ -184,6 +184,7 @@ export default async function PropertyPage({
                 lon={property.location.lon}
                 mapElementId={`styled-google-map-${property.slug}`}
                 markerTitle={addressLine}
+                mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
                 heightPx={650}
                 zoom={17}
                 mapTypeId="satellite"
