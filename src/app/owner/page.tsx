@@ -206,6 +206,7 @@ function reorderItems(list: OwnerMediaItem[], from: number, to: number) {
 export default function OwnerPage() {
   const [draft, setDraft] = useState<Draft>(initialDraft);
   const [media, setMedia] = useState<OwnerMediaState>(emptyMediaState);
+  const [mediaDirty, setMediaDirty] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [loadingListing, setLoadingListing] = useState(false);
   const [savingListing, setSavingListing] = useState(false);
@@ -280,6 +281,7 @@ export default function OwnerPage() {
     await signOut(firebaseAuth());
     setAuthState({ status: "signed_out" });
     setMedia(emptyMediaState);
+    setMediaDirty(false);
     setStatusMessage("");
   }
 
@@ -290,6 +292,7 @@ export default function OwnerPage() {
       if (!user) {
         setAuthState({ status: "signed_out" });
         setMedia(emptyMediaState);
+        setMediaDirty(false);
         return;
       }
       void (async () => {
@@ -407,6 +410,7 @@ export default function OwnerPage() {
       }
 
       setMedia(data.media);
+      setMediaDirty(false);
       if (showMessage) setStatusMessage("Media refreshed from Storage.");
     } catch (e) {
       setStatusMessage(e instanceof Error ? e.message : "Failed to load media");
@@ -435,6 +439,7 @@ export default function OwnerPage() {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || raw || "Failed to save media order");
       }
+      setMediaDirty(false);
       setStatusMessage("Media order saved.");
       return true;
     } catch (e) {
@@ -505,6 +510,7 @@ export default function OwnerPage() {
         throw new Error(data?.error || raw || "Save failed");
       }
 
+      setMediaDirty(false);
       setStatusMessage("Listing saved to Firestore.");
     } catch (e) {
       setStatusMessage(e instanceof Error ? e.message : "Save failed");
@@ -525,7 +531,9 @@ export default function OwnerPage() {
 
     setMediaBusy(true);
     try {
-      for (const file of Array.from(files)) {
+      const fileList = Array.from(files);
+      for (const [index, file] of fileList.entries()) {
+        setStatusMessage(`Uploading ${index + 1}/${fileList.length}: ${file.name}`);
         const form = new FormData();
         form.set("slug", slug);
         form.set("folder", folder);
@@ -593,7 +601,7 @@ export default function OwnerPage() {
       [folder]: reorderItems(list, index, nextIndex)
     };
     setMedia(nextMedia);
-    await persistMedia(nextMedia);
+    setMediaDirty(true);
   }
 
   async function renameDocument(item: OwnerMediaItem, label: string) {
@@ -606,7 +614,7 @@ export default function OwnerPage() {
       )
     };
     setMedia(nextMedia);
-    await persistMedia(nextMedia);
+    setMediaDirty(true);
   }
 
   const propertyJson = useMemo(() => {
@@ -741,10 +749,23 @@ export default function OwnerPage() {
             >
               Refresh Media
             </button>
+            <button
+              type="button"
+              onClick={() => void persistMedia(media)}
+              disabled={mediaBusy || !mediaDirty}
+              className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
+            >
+              Save Media Order
+            </button>
           </div>
 
           {statusMessage ? (
             <p className="mt-3 text-sm text-ink-700">{statusMessage}</p>
+          ) : null}
+          {mediaDirty ? (
+            <p className="mt-1 text-xs text-amber-700">
+              You have unsaved media ordering/label changes.
+            </p>
           ) : null}
         </div>
       </header>
@@ -915,7 +936,7 @@ export default function OwnerPage() {
             <div className="card p-6">
               <h2 className="text-base font-semibold text-ink-950">Media Manager</h2>
               <p className="mt-1 text-sm text-ink-600">
-                Uploaded files live in Storage at <span className="font-mono">listings/{safeSlug(draft.slug) || "<slug>"}/...</span>.
+                Upload and arrange your listing media.
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -983,7 +1004,7 @@ export default function OwnerPage() {
               <div className="border-b border-ink-100 px-6 py-4">
                 <p className="text-sm font-semibold text-ink-950">Firestore payload preview</p>
                 <p className="mt-1 text-sm text-ink-600">
-                  Includes Storage object paths and ordering that survive new builds.
+                  Preview of what will be saved.
                 </p>
               </div>
               <pre className="max-h-[50vh] overflow-auto bg-ink-950 p-5 text-xs text-white/90">
@@ -1094,25 +1115,29 @@ function MediaPanel({
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-ink-600">No files yet.</p>
       ) : (
-        <ul className="mt-3 grid gap-3">
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2">
           {items.map((item, index) => (
             <li key={item.objectPath} className="rounded-xl border border-ink-100 p-3">
-              {isImageItem(item) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={item.signedUrl}
-                  alt={item.name}
-                  className="h-24 w-full rounded-lg object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="flex h-24 w-full items-center justify-center rounded-lg bg-ink-50 text-sm text-ink-600">
-                  File
+              <div className="flex gap-3">
+                {isImageItem(item) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.signedUrl}
+                    alt={item.name}
+                    className="h-20 w-28 shrink-0 rounded-lg object-cover sm:h-24 sm:w-32"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-ink-50 text-xs text-ink-600 sm:h-24 sm:w-32">
+                    File
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-ink-500">#{index + 1}</p>
+                  <p className="truncate text-sm font-medium text-ink-900">{item.name}</p>
+                  <p className="truncate text-xs text-ink-600">{item.objectPath}</p>
                 </div>
-              )}
-
-              <p className="mt-2 truncate text-sm font-medium text-ink-900">{item.name}</p>
-              <p className="truncate text-xs text-ink-600">{item.objectPath}</p>
+              </div>
 
               {folder === "docs" && onRename ? (
                 <input

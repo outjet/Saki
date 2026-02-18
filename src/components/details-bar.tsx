@@ -107,14 +107,14 @@ function Stat({
   suffix?: string;
 }) {
   return (
-    <div className="flex min-w-[150px] flex-1 flex-col items-center px-4 py-5 text-center">
-      <span className="mb-2 inline-flex h-11 w-11 items-center justify-center text-ink-950">
+    <div className="flex min-w-[130px] flex-1 flex-col items-center px-3 py-4 text-center">
+      <span className="mb-2 inline-flex h-8 w-8 items-center justify-center text-ink-950">
         {icon}
       </span>
-      <span className="text-2xl font-semibold tracking-tight text-ink-950">
+      <span className="text-xl font-semibold tracking-tight text-ink-950">
         {count}
       </span>
-      {suffix ? <span className="mt-1 text-sm text-ink-600">{suffix}</span> : null}
+      {suffix ? <span className="mt-1 text-xs text-ink-600">{suffix}</span> : null}
     </div>
   );
 }
@@ -131,22 +131,22 @@ export function DetailsBar({ property }: { property: Property }) {
     <section id="details" className="full-bleed bg-ink-50">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-8 px-4 py-6 sm:px-6 lg:flex-row">
         <div className="text-center lg:text-left">
-          <div className="text-sm font-medium text-ink-600">Offered At</div>
-          <div className="mt-1 text-4xl font-semibold tracking-tight text-ink-950 sm:text-5xl">
+          <div className="text-xs font-medium text-ink-600">Offered At</div>
+          <div className="mt-1 text-3xl font-semibold tracking-tight text-ink-950 sm:text-4xl">
             {formatMoney(property.price)}
           </div>
         </div>
 
         <div className="flex w-full flex-wrap justify-center lg:w-auto lg:flex-nowrap lg:justify-end">
-          <Stat icon={<IconBed className="h-11 w-11" />} count={`${property.beds} Beds`} />
-          <Stat icon={<IconBath className="h-11 w-11" />} count={`${property.baths} Baths`} />
+          <Stat icon={<IconBed className="h-8 w-8" />} count={`${property.beds} Beds`} />
+          <Stat icon={<IconBath className="h-8 w-8" />} count={`${property.baths} Baths`} />
           <Stat
-            icon={<IconRuler className="h-11 w-11" />}
+            icon={<IconRuler className="h-8 w-8" />}
             count={`${property.homeSqft.toLocaleString()} sqft`}
             suffix="Home Size"
           />
           <Stat
-            icon={<IconLayers className="h-11 w-11" />}
+            icon={<IconLayers className="h-8 w-8" />}
             count={lot}
             suffix="Lot Size"
           />
@@ -155,4 +155,3 @@ export function DetailsBar({ property }: { property: Property }) {
     </section>
   );
 }
-

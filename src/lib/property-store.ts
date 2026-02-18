@@ -17,6 +17,9 @@ function byName(a: string, b: string) {
 }
 
 const PUBLIC_LISTINGS_ROOT = path.join(process.cwd(), "public", "listings");
+const ENABLE_PUBLIC_LISTINGS_FALLBACK =
+  String(process.env.ENABLE_PUBLIC_LISTINGS_FALLBACK ?? "true").toLowerCase() !==
+  "false";
 
 async function fileExists(p: string) {
   try {
@@ -163,6 +166,15 @@ async function autoDiscoverMedia(slug: string) {
     docPaths.length === 0;
 
   if (noCloudMedia) {
+    if (!ENABLE_PUBLIC_LISTINGS_FALLBACK) {
+      return {
+        hero: [] as string[],
+        photos: [] as string[],
+        floorplans: [] as string[],
+        documents: [] as { label: string; href: string }[]
+      };
+    }
+
     const [hero, photos, floorplans, docs] = await Promise.all([
       listPublicFiles(slug, "hero").catch(() => [] as string[]),
       listPublicFiles(slug, "photos").catch(() => [] as string[]),

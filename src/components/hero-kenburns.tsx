@@ -38,7 +38,7 @@ export function HeroKenBurns({
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/80">
               For Sale By Owner
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-4xl">
               {title}
             </h1>
           </div>
@@ -47,4 +47,3 @@ export function HeroKenBurns({
     </section>
   );
 }
-
