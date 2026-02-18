@@ -267,23 +267,23 @@ export default function OwnerPage() {
                 <UploadRow
                   label="Hero images"
                   hint="Top carousel (wide images recommended)."
-                  onPick={(files) => void uploadFiles("hero", files)}
+                  onPick={(files) => uploadFiles("hero", files)}
                 />
                 <UploadRow
                   label="Gallery photos"
                   hint="Shown in Photos section (hero images are included too)."
-                  onPick={(files) => void uploadFiles("photos", files)}
+                  onPick={(files) => uploadFiles("photos", files)}
                 />
                 <UploadRow
                   label="Floor plans"
                   hint="Optional."
-                  onPick={(files) => void uploadFiles("floorplans", files)}
+                  onPick={(files) => uploadFiles("floorplans", files)}
                 />
                 <UploadRow
                   label="Documents"
                   hint="PDFs/brochures."
                   accept=".pdf"
-                  onPick={(files) => void uploadFiles("docs", files)}
+                  onPick={(files) => uploadFiles("docs", files)}
                 />
               </div>
 
@@ -549,21 +549,54 @@ function UploadRow({
   label: string;
   hint: string;
   accept?: string;
-  onPick: (files: FileList) => void;
+  onPick: (files: FileList) => Promise<void>;
 }) {
+  const [status, setStatus] = useState<
+    | { state: "idle" }
+    | { state: "picked"; count: number }
+    | { state: "uploading"; count: number }
+    | { state: "done"; count: number }
+    | { state: "error"; message: string }
+  >({ state: "idle" });
+
   return (
     <label className="card flex flex-col justify-between gap-3 p-4">
       <div>
         <p className="text-sm font-semibold text-ink-950">{label}</p>
         <p className="mt-1 text-sm text-ink-600">{hint}</p>
+        {status.state === "picked" ? (
+          <p className="mt-2 text-sm text-ink-700">Selected {status.count} file(s).</p>
+        ) : status.state === "uploading" ? (
+          <p className="mt-2 text-sm text-ink-700">Uploading {status.count} file(s)…</p>
+        ) : status.state === "done" ? (
+          <p className="mt-2 text-sm text-green-700">Uploaded {status.count} file(s).</p>
+        ) : status.state === "error" ? (
+          <p className="mt-2 text-sm text-red-700">{status.message}</p>
+        ) : null}
       </div>
       <input
         type="file"
         multiple
         accept={accept}
-        onChange={(e) => {
-          if (e.target.files && e.target.files.length > 0) onPick(e.target.files);
-          e.currentTarget.value = "";
+        disabled={status.state === "uploading"}
+        onChange={async (e) => {
+          const files = e.target.files;
+          if (!files || files.length === 0) return;
+
+          setStatus({ state: "picked", count: files.length });
+          try {
+            setStatus({ state: "uploading", count: files.length });
+            await onPick(files);
+            setStatus({ state: "done", count: files.length });
+          } catch (err) {
+            setStatus({
+              state: "error",
+              message: err instanceof Error ? err.message : "Upload failed."
+            });
+          } finally {
+            // Clear so picking the same file again triggers onChange.
+            e.currentTarget.value = "";
+          }
         }}
         className="block w-full text-sm text-ink-700 file:mr-3 file:rounded-lg file:border file:border-ink-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink-900 hover:file:bg-ink-50"
       />

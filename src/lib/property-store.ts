@@ -1,5 +1,7 @@
 import type { Property } from "@/lib/types";
 import { adminBucket, adminDb } from "@/lib/firebase-admin";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 function isServerFirebaseAvailable() {
   return Boolean(
@@ -12,6 +14,43 @@ function isServerFirebaseAvailable() {
 
 function byName(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true });
+}
+
+const PUBLIC_LISTINGS_ROOT = path.join(process.cwd(), "public", "listings");
+
+async function fileExists(p: string) {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isMediaFile(name: string) {
+  const lower = name.toLowerCase();
+  return (
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.endsWith(".png") ||
+    lower.endsWith(".webp") ||
+    lower.endsWith(".avif") ||
+    lower.endsWith(".svg")
+  );
+}
+
+async function listPublicFiles(slug: string, subdir: string) {
+  const dir = path.join(PUBLIC_LISTINGS_ROOT, slug, subdir);
+  if (!(await fileExists(dir))) return [];
+
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const files = entries
+    .filter((e) => e.isFile())
+    .map((e) => e.name)
+    .filter((n) => (subdir === "docs" ? true : isMediaFile(n)))
+    .sort(byName);
+
+  return files.map((f) => `/listings/${slug}/${subdir}/${f}`);
 }
 
 async function listObjectPaths(prefix: string) {
@@ -47,6 +86,32 @@ async function autoDiscoverMedia(slug: string) {
     listObjectPaths(`${base}floorplans/`).catch(() => [] as string[]),
     listObjectPaths(`${base}docs/`).catch(() => [] as string[])
   ]);
+
+  const noCloudMedia =
+    heroPaths.length === 0 &&
+    photoPaths.length === 0 &&
+    floorplanPaths.length === 0 &&
+    docPaths.length === 0;
+
+  if (noCloudMedia) {
+    const [hero, photos, floorplans, docs] = await Promise.all([
+      listPublicFiles(slug, "hero").catch(() => [] as string[]),
+      listPublicFiles(slug, "photos").catch(() => [] as string[]),
+      listPublicFiles(slug, "floorplans").catch(() => [] as string[]),
+      listPublicFiles(slug, "docs").catch(() => [] as string[])
+    ]);
+
+    const mergedPhotos = Array.from(new Set([...hero, ...photos]));
+    return {
+      hero,
+      photos: mergedPhotos,
+      floorplans,
+      documents: docs.map((href) => ({
+        label: href.split("/").pop() ?? "Document",
+        href
+      }))
+    };
+  }
 
   const [heroUrls, photoUrls, floorUrls, docUrls] = await Promise.all([
     signedReadUrls(heroPaths),
