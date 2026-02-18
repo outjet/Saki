@@ -6,7 +6,7 @@ import {
   signInWithPopup,
   signOut
 } from "firebase/auth";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { firebaseAuth } from "@/lib/firebase-client";
 
 type Draft = {
@@ -223,6 +223,8 @@ export default function OwnerPage() {
     | { status: "error"; message: string }
     | { status: "ready"; email: string; token: string }
   >({ status: "signed_out" });
+  const normalizedSlug = useMemo(() => safeSlug(draft.slug), [draft.slug]);
+  const readyToken = authState.status === "ready" ? authState.token : null;
 
   async function ensureSignedIn() {
     try {
@@ -261,7 +263,7 @@ export default function OwnerPage() {
       }
 
       setAuthState({ status: "ready", email: me.email || "", token });
-      void loadMediaWithToken(token);
+      if (normalizedSlug) void loadMediaWithToken(token, normalizedSlug);
       return token;
     } catch (e) {
       setAuthState({
@@ -387,13 +389,14 @@ export default function OwnerPage() {
   async function loadMedia(showMessage = false) {
     const token = await getToken();
     if (!token) return;
-    await loadMediaWithToken(token, showMessage);
+    if (!normalizedSlug) {
+      setStatusMessage("Set a slug first.");
+      return;
+    }
+    await loadMediaWithToken(token, normalizedSlug, showMessage);
   }
 
-  async function loadMediaWithToken(token: string, showMessage = false) {
-    const slug = safeSlug(draft.slug);
-    if (!slug) return;
-
+  const loadMediaWithToken = useCallback(async (token: string, slug: string, showMessage = false) => {
     setMediaBusy(true);
     try {
       const res = await fetch(`/api/admin/media?slug=${encodeURIComponent(slug)}`, {
@@ -417,7 +420,7 @@ export default function OwnerPage() {
     } finally {
       setMediaBusy(false);
     }
-  }
+  }, []);
 
   async function persistMedia(nextMedia: OwnerMediaState) {
     const token = await getToken();
@@ -658,6 +661,14 @@ export default function OwnerPage() {
     return JSON.stringify(data, null, 2);
   }, [draft, media, mediaExtras]);
 
+  useEffect(() => {
+    if (!readyToken || !normalizedSlug) return;
+    const timer = setTimeout(() => {
+      void loadMediaWithToken(readyToken, normalizedSlug);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [readyToken, normalizedSlug, loadMediaWithToken]);
+
   if (authState.status !== "ready") {
     return (
       <main>
@@ -723,6 +734,12 @@ export default function OwnerPage() {
             >
               Sign out
             </button>
+            <a
+              href={normalizedSlug ? `/p/${normalizedSlug}` : "/"}
+              className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 hover:bg-ink-50"
+            >
+              Back to Listing
+            </a>
             <button
               type="button"
               onClick={() => void loadListing()}
@@ -1038,26 +1055,33 @@ function UploadRow({
   accept?: string;
   onPick: (files: FileList) => Promise<void>;
 }) {
+  const inputId = useId();
   const [status, setStatus] = useState<
     | { state: "idle" }
+    | { state: "picked"; count: number }
     | { state: "uploading"; count: number }
     | { state: "done"; count: number }
     | { state: "error"; message: string }
   >({ state: "idle" });
 
   return (
-    <label className="rounded-xl border border-ink-200 bg-ink-50/70 p-3">
+    <div className="rounded-xl border border-ink-200 bg-ink-50/70 p-4 min-h-[170px]">
       <p className="text-sm font-semibold text-ink-950">{label}</p>
       <p className="mt-1 text-xs text-ink-600">{hint}</p>
-      {status.state === "uploading" ? (
-        <p className="mt-2 text-xs text-ink-700">Uploading {status.count} file(s)...</p>
-      ) : status.state === "done" ? (
-        <p className="mt-2 text-xs text-green-700">Uploaded {status.count} file(s).</p>
-      ) : status.state === "error" ? (
-        <p className="mt-2 text-xs text-red-700">{status.message}</p>
-      ) : null}
+      <div className="mt-3 min-h-[1.25rem]">
+        {status.state === "picked" ? (
+          <p className="text-xs text-ink-700">Selected {status.count} file(s).</p>
+        ) : status.state === "uploading" ? (
+          <p className="text-xs text-ink-700">Uploading {status.count} file(s)...</p>
+        ) : status.state === "done" ? (
+          <p className="text-xs text-green-700">Uploaded {status.count} file(s).</p>
+        ) : status.state === "error" ? (
+          <p className="text-xs text-red-700">{status.message}</p>
+        ) : null}
+      </div>
 
       <input
+        id={inputId}
         type="file"
         multiple
         accept={accept}
@@ -1067,8 +1091,9 @@ function UploadRow({
           const files = input.files;
           if (!files || files.length === 0) return;
 
-          setStatus({ state: "uploading", count: files.length });
+          setStatus({ state: "picked", count: files.length });
           try {
+            setStatus({ state: "uploading", count: files.length });
             await onPick(files);
             setStatus({ state: "done", count: files.length });
           } catch (err) {
@@ -1080,9 +1105,19 @@ function UploadRow({
             input.value = "";
           }
         }}
-        className="mt-3 block w-full text-sm text-ink-700 file:mr-3 file:rounded-lg file:border file:border-ink-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink-900 hover:file:bg-ink-50"
+        className="sr-only"
       />
-    </label>
+
+      <label
+        htmlFor={inputId}
+        className="mt-3 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border border-ink-200 bg-white px-3 text-sm font-semibold text-ink-900 hover:bg-ink-50"
+      >
+        Choose Files
+      </label>
+      <p className="mt-2 text-xs text-ink-500">
+        Images: JPG, PNG, WEBP, AVIF. Docs: PDF.
+      </p>
+    </div>
   );
 }
 
@@ -1114,7 +1149,8 @@ function MediaPanel({
 
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-ink-600">No files yet.</p>
-      ) : (
+      ) : null}
+      {items.length > 0 ? (
         <ul className="mt-3 grid gap-3 sm:grid-cols-2">
           {items.map((item, index) => (
             <li key={item.objectPath} className="rounded-xl border border-ink-100 p-3">
@@ -1147,7 +1183,7 @@ function MediaPanel({
                 />
               ) : null}
 
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 border-t border-ink-100 pt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => onMove(index, -1)}
@@ -1176,7 +1212,7 @@ function MediaPanel({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }
