@@ -118,9 +118,9 @@ export default async function PropertyPage({
                   </div>
                 ) : (
                   <div>
-                    <h3 className="text-base font-semibold text-white">Schedule a tour</h3>
+                    {/* <h3 className="text-base font-semibold text-white">Schedule a tour</h3> */}
                     <p className="mt-2 text-sm text-white/85">
-                      Contact the agent below to arrange a private showing.
+                      {/* Contact the agent below to arrange a private showing. */}
                     </p>
                   </div>
                 )}
