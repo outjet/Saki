@@ -64,12 +64,12 @@ export default async function PropertyPage({
       ? [{ id: "features", label: "Features" }]
       : []),
     ...(photos.length > 0 ? [{ id: "photos", label: "Photos" }] : []),
-    ...(hasMap ? [{ id: "map", label: "Map" }] : []),
     ...(hasVideo ? [{ id: "video", label: "Video" }] : []),
     ...(tours.length > 0 ? [{ id: "tours", label: "Tours" }] : []),
     ...(floorplans.length > 0 ? [{ id: "floorplans", label: "Floor plans" }] : []),
     ...(documents.length > 0 ? [{ id: "documents", label: "Documents" }] : []),
-    { id: "contact", label: "Contact" }
+    { id: "contact", label: "Contact" },
+    ...(hasMap ? [{ id: "map", label: "Map" }] : [])
   ];
 
   return (
@@ -158,6 +158,39 @@ export default async function PropertyPage({
           <Gallery images={photos} columns={3} label="Photos" />
         </Section>
       ) : null}
+
+      <section id="contact" className="relative py-10 sm:py-12">
+        {contactVideo ? (
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+          >
+            <source src={contactVideo} />
+          </video>
+        ) : null}
+        <div className="relative container-page">
+          <div className="rounded-3xl border border-white/20 bg-slate-700/35 p-6 sm:p-8">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
+                <p className="mt-1 text-sm text-white/85">
+                  Please reach out with any questions.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6">
+              <div className="mx-auto max-w-3xl">
+                <InquiryForm propertySlug={property.slug} tone="dark" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {property.location ? (
         <section id="map" className="py-10 sm:py-12">
@@ -268,39 +301,6 @@ export default async function PropertyPage({
           </div>
         </Section>
       ) : null}
-
-      <section id="contact" className="relative py-10 sm:py-12">
-        {contactVideo ? (
-          <video
-            className="absolute inset-0 h-full w-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-          >
-            <source src={contactVideo} />
-          </video>
-        ) : null}
-        <div className="relative container-page">
-          <div className="rounded-3xl border border-white/20 bg-slate-700/35 p-6 sm:p-8">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
-                <p className="mt-1 text-sm text-white/85">
-                  Please reach out with any questions.
-                </p>
-              </div>
-            </div>
-            <div className="mt-6">
-              <div className="mx-auto max-w-3xl">
-                <InquiryForm propertySlug={property.slug} tone="dark" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <footer className="border-t border-ink-100">
         <div className="container-page py-10 text-sm text-ink-600">
