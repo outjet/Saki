@@ -215,6 +215,23 @@ function reorderItems(list: OwnerMediaItem[], from: number, to: number) {
   return next;
 }
 
+function toLocalDateTimeInput(iso: string) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+}
+
+function fromLocalDateTimeInput(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString();
+}
+
 export default function OwnerPage() {
   const [draft, setDraft] = useState<Draft>(initialDraft);
   const [media, setMedia] = useState<OwnerMediaState>(emptyMediaState);
@@ -801,14 +818,14 @@ export default function OwnerPage() {
             >
               Back to Listing
             </a>
-            <button
+            {/* <button
               type="button"
               onClick={() => void loadListing()}
               disabled={loadingListing}
               className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
             >
               {loadingListing ? "Loading..." : "Load Listing"}
-            </button>
+            </button> */}
 
             <button
               type="button"
@@ -817,23 +834,6 @@ export default function OwnerPage() {
               className="rounded-xl bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               {savingListing ? "Saving..." : "Save Listing"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void loadMedia(true)}
-              disabled={mediaBusy}
-              className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
-            >
-              Refresh Media
-            </button>
-            <button
-              type="button"
-              onClick={() => void persistMedia(media)}
-              disabled={mediaBusy || !mediaDirty}
-              className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
-            >
-              Save Media Order
             </button>
           </div>
 
@@ -984,10 +984,13 @@ export default function OwnerPage() {
                   />
                 </Field>
 
-                <Field label="Open house start (ISO)">
+                <Field label="Open house date & time">
                   <input
-                    value={draft.openHouseIso}
-                    onChange={(e) => setDraft({ ...draft, openHouseIso: e.target.value })}
+                    type="datetime-local"
+                    value={toLocalDateTimeInput(draft.openHouseIso)}
+                    onChange={(e) =>
+                      setDraft({ ...draft, openHouseIso: fromLocalDateTimeInput(e.target.value) })
+                    }
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
@@ -1013,6 +1016,24 @@ export default function OwnerPage() {
               <p className="mt-1 text-sm text-ink-600">
                 Upload and arrange your listing media.
               </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void loadMedia(true)}
+                  disabled={mediaBusy}
+                  className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
+                >
+                  Load Images
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void persistMedia(media)}
+                  disabled={mediaBusy || !mediaDirty}
+                  className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-900 enabled:hover:bg-ink-50 disabled:opacity-50"
+                >
+                  Save Media Order
+                </button>
+              </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <UploadRow
