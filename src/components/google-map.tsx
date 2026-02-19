@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type GoogleMapProps = {
   lat: number;
   lon: number;
+  mapId?: string;
   zoom?: number;
   heightPx?: number;
   mapTypeId?: "roadmap" | "satellite" | "hybrid" | "terrain";
@@ -17,6 +18,7 @@ type GoogleMapProps = {
 export function GoogleMap({
   lat,
   lon,
+  mapId,
   zoom = 17,
   heightPx = 650,
   mapTypeId = "satellite",
@@ -59,6 +61,7 @@ export function GoogleMap({
       zoom,
       mapTypeId,
       styles: mapStyle as any,
+      ...(mapId ? { mapId } : {}),
 
       // keep the map "normal"
       streetViewControl: true,
