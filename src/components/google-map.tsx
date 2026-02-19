@@ -29,7 +29,7 @@ export function GoogleMap({
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const effectiveMapId = mapId ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [ready, setReady] = useState(false);
-  const [interactive, setInteractive] = useState(false);
+  const [interactive, setInteractive] = useState(true);
   const mapRef = useRef<unknown>(null);
   const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverUnlockDelayMs = 2000;
@@ -207,7 +207,7 @@ export function GoogleMap({
             onMouseLeave={() => {
               clearUnlockTimer();
             }}
-            className="absolute inset-0 z-10 flex w-full items-center justify-center bg-black/10 text-center text-white"
+            className="absolute inset-0 z-10 flex w-full items-center justify-center bg-black/5 text-center text-white"
             aria-label="Enable map interactions"
           >
             <span className="rounded-xl bg-black/45 px-4 py-3 text-sm font-medium">
