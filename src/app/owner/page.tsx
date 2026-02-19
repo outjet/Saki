@@ -962,21 +962,21 @@ export default function OwnerPage() {
                   />
                 </Field>
 
-                <Field label="Agent name">
+                <Field label="Contact name">
                   <input
                     value={draft.agentName}
                     onChange={(e) => setDraft({ ...draft, agentName: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
-                <Field label="Agent phone">
+                <Field label="Contact phone">
                   <input
                     value={draft.agentPhone}
                     onChange={(e) => setDraft({ ...draft, agentPhone: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>
-                <Field label="Agent email">
+                <Field label="Contact email">
                   <input
                     value={draft.agentEmail}
                     onChange={(e) => setDraft({ ...draft, agentEmail: e.target.value })}
