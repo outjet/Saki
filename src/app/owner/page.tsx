@@ -27,6 +27,7 @@ type Draft = {
   agentPhone: string;
   agentEmail: string;
   openHouseIso: string;
+  openHouseEndIso: string;
   lat: string;
   lon: string;
 };
@@ -91,7 +92,7 @@ type LoadedProperty = {
     phone?: string;
     email?: string;
   };
-  openHouses?: { startIso?: string }[];
+  openHouses?: { startIso?: string; endIso?: string }[];
   location?: { lat?: number; lon?: number };
   media?: {
     video?: PropertyMediaExtras["video"];
@@ -118,6 +119,7 @@ function blankDraft(slug = "23760-emmons-road"): Draft {
     agentPhone: "",
     agentEmail: "",
     openHouseIso: "",
+    openHouseEndIso: "",
     lat: "",
     lon: ""
   };
@@ -192,6 +194,7 @@ function draftFromProperty(property: LoadedProperty, current: Draft): Draft {
     agentPhone: asString(property.agent?.phone, current.agentPhone),
     agentEmail: asString(property.agent?.email, current.agentEmail),
     openHouseIso: asString(property.openHouses?.[0]?.startIso, current.openHouseIso),
+    openHouseEndIso: asString(property.openHouses?.[0]?.endIso, current.openHouseEndIso),
     lat:
       property.location?.lat !== undefined
         ? String(property.location.lat)
@@ -585,7 +588,14 @@ export default function OwnerPage() {
         phone: draft.agentPhone || undefined,
         email: draft.agentEmail || undefined
       },
-      openHouses: draft.openHouseIso ? [{ startIso: draft.openHouseIso, note: "Open house" }] : [],
+      openHouses: draft.openHouseIso
+        ? [
+            {
+              startIso: draft.openHouseIso,
+              endIso: draft.openHouseEndIso || undefined
+            }
+          ]
+        : [],
       location:
         draft.lat && draft.lon
           ? { lat: Number(draft.lat), lon: Number(draft.lon) }
@@ -942,7 +952,14 @@ export default function OwnerPage() {
         phone: draft.agentPhone || undefined,
         email: draft.agentEmail || undefined
       },
-      openHouses: draft.openHouseIso ? [{ startIso: draft.openHouseIso, note: "Open house" }] : [],
+      openHouses: draft.openHouseIso
+        ? [
+            {
+              startIso: draft.openHouseIso,
+              endIso: draft.openHouseEndIso || undefined
+            }
+          ]
+        : [],
       location:
         draft.lat && draft.lon
           ? { lat: Number(draft.lat), lon: Number(draft.lon) }
@@ -1211,13 +1228,28 @@ export default function OwnerPage() {
                   />
                 </Field>
 
-                <Field label="Open house date & time">
+                <Field label="Open house start">
                   <input
                     type="datetime-local"
                     value={toLocalDateTimeInput(draft.openHouseIso)}
                     onChange={(e) =>
                       setDraft({ ...draft, openHouseIso: fromLocalDateTimeInput(e.target.value) })
                     }
+                    step={900}
+                    className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
+                  />
+                </Field>
+                <Field label="Open house end">
+                  <input
+                    type="datetime-local"
+                    value={toLocalDateTimeInput(draft.openHouseEndIso)}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        openHouseEndIso: fromLocalDateTimeInput(e.target.value)
+                      })
+                    }
+                    step={900}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>

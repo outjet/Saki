@@ -105,13 +105,14 @@ export default async function PropertyPage({
 
               <div className="lg:col-span-4">
                 {property.openHouses && property.openHouses.length > 0 ? (
-                  <div>
-                    <h3 className="text-base font-semibold text-white">Open house</h3>
+                  <div className="rounded-2xl border border-white/25 bg-white/10 p-4">
+                    <h3 className="text-lg font-semibold text-white">
+                      Visit us at our upcoming open house!
+                    </h3>
                     <ul className="mt-3 grid gap-3 text-sm text-white/90">
                       {property.openHouses.map((oh) => (
                         <li key={oh.startIso} className="border-t border-white/25 pt-3">
                           <p className="font-medium">{formatOpenHouse(oh)}</p>
-                          {oh.note ? <p className="mt-1 text-white/80">{oh.note}</p> : null}
                         </li>
                       ))}
                     </ul>
@@ -179,7 +180,7 @@ export default async function PropertyPage({
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
                 <p className="mt-1 text-sm text-white/85">
-                  Please reach out with any questions.
+                  <b>For more information, call/text Carolyn at 216-505-7557, or leave a message below.</b>
                 </p>
               </div>
             </div>
