@@ -150,6 +150,8 @@ const PHOTO_SPACE_SUGGESTIONS = [
   "Office",
   "Laundry"
 ];
+const PHOTO_DRAG_MIME = "application/x-owner-photo";
+const ROOM_DRAG_MIME = "application/x-owner-room";
 
 function safeSlug(value: string) {
   return value
@@ -1519,6 +1521,7 @@ function MediaPanel({
   const isPhotoPanel = folder === "photos";
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [dropPlacement, setDropPlacement] = useState<"before" | "after">("before");
   const handleDragIndex = useRef<number | null>(null);
   const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({});
   const [spaceDragName, setSpaceDragName] = useState<string | null>(null);
@@ -1608,29 +1611,52 @@ function MediaPanel({
         key={item.objectPath}
         onDragOver={(e) => {
           if (busy) return;
+          if (!Array.from(e.dataTransfer.types || []).includes(PHOTO_DRAG_MIME)) return;
           e.preventDefault();
+          e.stopPropagation();
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          const nextPlacement = e.clientY >= rect.top + rect.height / 2 ? "after" : "before";
           setDropIndex(index);
+          setDropPlacement(nextPlacement);
         }}
         onDrop={(e) => {
+          if (!Array.from(e.dataTransfer.types || []).includes(PHOTO_DRAG_MIME)) return;
           e.preventDefault();
-          if (busy || dragIndex == null || dragIndex === index) {
+          e.stopPropagation();
+          if (busy || dragIndex == null) {
             setDragIndex(null);
             setDropIndex(null);
             return;
           }
-          onReorder(dragIndex, index);
+          const insertAt = index + (dropPlacement === "after" ? 1 : 0);
+          const targetIndex = dragIndex < insertAt ? insertAt - 1 : insertAt;
+          if (targetIndex === dragIndex) {
+            setDragIndex(null);
+            setDropIndex(null);
+            return;
+          }
+          onReorder(dragIndex, targetIndex);
           setDragIndex(null);
           setDropIndex(null);
         }}
         onDragEnd={() => {
           setDragIndex(null);
           setDropIndex(null);
+          setDropPlacement("before");
           handleDragIndex.current = null;
         }}
-        className={`rounded-xl border p-3 ${
+        className={`relative rounded-xl border p-3 ${
           dropIndex === index ? "border-ink-300 bg-ink-50" : "border-ink-100"
         }`}
       >
+        {dropIndex === index ? (
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute left-3 right-3 h-0.5 bg-ink-400 ${
+              dropPlacement === "after" ? "bottom-0" : "top-0"
+            }`}
+          />
+        ) : null}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <button
@@ -1650,11 +1676,14 @@ function MediaPanel({
                   return;
                 }
                 setDragIndex(index);
+                e.dataTransfer.setData(PHOTO_DRAG_MIME, String(index));
+                e.dataTransfer.setData("text/plain", item.objectPath);
                 e.dataTransfer.effectAllowed = "move";
               }}
               onDragEnd={() => {
                 setDragIndex(null);
                 setDropIndex(null);
+                setDropPlacement("before");
                 handleDragIndex.current = null;
               }}
               className="mt-1 inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
@@ -1791,11 +1820,22 @@ function MediaPanel({
                 key={group.space}
                 onDragOver={(e) => {
                   if (busy) return;
+                  const dragTypes = Array.from(e.dataTransfer.types || []);
+                  const isFileDrop = dragTypes.includes("Files");
+                  const isRoomDrag = dragTypes.includes(ROOM_DRAG_MIME);
+                  const isPhotoDrag = dragTypes.includes(PHOTO_DRAG_MIME);
+                  if (!isFileDrop && !isRoomDrag && !isPhotoDrag) return;
                   e.preventDefault();
+                  e.stopPropagation();
                   setSpaceDropName(group.space);
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
+                  const dragTypes = Array.from(e.dataTransfer.types || []);
+                  const isFileDrop = dragTypes.includes("Files");
+                  const isRoomDrag = dragTypes.includes(ROOM_DRAG_MIME);
+                  const isPhotoDrag = dragTypes.includes(PHOTO_DRAG_MIME);
                   if (busy) {
                     setSpaceDragName(null);
                     setSpaceDropName(null);
@@ -1803,7 +1843,7 @@ function MediaPanel({
                     setDropIndex(null);
                     return;
                   }
-                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  if (isFileDrop && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                     if (onDropFilesToPhotoSpace) {
                       onDropFilesToPhotoSpace(group.space, e.dataTransfer.files);
                     }
@@ -1813,7 +1853,7 @@ function MediaPanel({
                     setDropIndex(null);
                     return;
                   }
-                  if (dragIndex != null && onAssignPhotoSpace) {
+                  if (isPhotoDrag && dragIndex != null && onAssignPhotoSpace) {
                     const dragged = items[dragIndex];
                     if (dragged) onAssignPhotoSpace(dragged, group.space);
                     setDragIndex(null);
@@ -1822,7 +1862,12 @@ function MediaPanel({
                     setSpaceDropName(null);
                     return;
                   }
-                  if (spaceDragName && spaceDragName !== group.space && onMovePhotoSpaceGroup) {
+                  if (
+                    isRoomDrag &&
+                    spaceDragName &&
+                    spaceDragName !== group.space &&
+                    onMovePhotoSpaceGroup
+                  ) {
                     onMovePhotoSpaceGroup(spaceDragName, group.space);
                   }
                   setSpaceDragName(null);
@@ -1848,6 +1893,8 @@ function MediaPanel({
                         return;
                       }
                       setSpaceDragName(group.space);
+                      e.dataTransfer.setData(ROOM_DRAG_MIME, group.space);
+                      e.dataTransfer.setData("text/plain", group.space);
                       e.dataTransfer.effectAllowed = "move";
                     }}
                     onDragEnd={() => {
