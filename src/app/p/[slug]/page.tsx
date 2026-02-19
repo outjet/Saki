@@ -106,7 +106,7 @@ export default async function PropertyPage({
               <div className="lg:col-span-4">
                 {property.openHouses && property.openHouses.length > 0 ? (
                   <div className="rounded-2xl border border-white/25 bg-white/10 p-4">
-                    <h3 className="text-lg font-semibold text-white">
+                    <h3 className="text-lg font-semibold text-[#ffed14]">
                       Visit us at our upcoming open house!
                     </h3>
                     <ul className="mt-3 grid gap-3 text-sm text-white/90">

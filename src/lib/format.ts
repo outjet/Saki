@@ -20,19 +20,22 @@ export function formatOpenHouse(oh: OpenHouse) {
     weekday: "short",
     month: "short",
     day: "2-digit",
-    year: "numeric"
+    year: "numeric",
+    timeZone: "America/New_York"
   }).format(start);
 
   const time = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
-    minute: "2-digit"
+    minute: "2-digit",
+    timeZone: "America/New_York"
   }).format(start);
 
   const endTime =
     end &&
     new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
-      minute: "2-digit"
+      minute: "2-digit",
+      timeZone: "America/New_York"
     }).format(end);
 
   return endTime ? `${date} · ${time}–${endTime}` : `${date} · ${time}`;
