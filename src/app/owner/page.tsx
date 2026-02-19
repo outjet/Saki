@@ -1424,6 +1424,31 @@ function MediaPanel({
     });
     return groups;
   }, [items]);
+  const existingPhotoSpaces = useMemo(
+    () =>
+      isPhotoPanel
+        ? Array.from(
+            new Set(
+              items
+                .map((item) => String(item.space ?? "").trim())
+                .filter(Boolean)
+            )
+          )
+        : [],
+    [isPhotoPanel, items]
+  );
+  const photoSpaceOptions = useMemo(() => {
+    const merged = [...existingPhotoSpaces, ...PHOTO_SPACE_SUGGESTIONS];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const value of merged) {
+      const key = value.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(value);
+    }
+    return out;
+  }, [existingPhotoSpaces]);
 
   function toggleSpace(space: string) {
     setCollapsedSpaces((prev) => ({ ...prev, [space]: !prev[space] }));
@@ -1504,6 +1529,13 @@ function MediaPanel({
                   list={spaceListId}
                   defaultValue={item.space || ""}
                   placeholder="Assign a space (e.g., Kitchen)"
+                  autoComplete="off"
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    onAssignPhotoSpace(item, (e.currentTarget as HTMLInputElement).value);
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }}
                   onBlur={(e) => onAssignPhotoSpace(item, e.target.value)}
                   className="mt-2 h-9 w-full rounded-lg border border-ink-200 px-2 text-xs"
                 />
@@ -1570,7 +1602,7 @@ function MediaPanel({
       {items.length > 0 && isPhotoPanel ? (
         <>
           <datalist id={spaceListId}>
-            {PHOTO_SPACE_SUGGESTIONS.map((space) => (
+            {photoSpaceOptions.map((space) => (
               <option key={space} value={space} />
             ))}
           </datalist>
