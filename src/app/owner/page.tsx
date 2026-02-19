@@ -53,6 +53,7 @@ type OwnerMediaItem = {
 type OwnerMediaState = {
   hero: OwnerMediaItem[];
   photos: OwnerMediaItem[];
+  photoSpaceOrder: string[];
   floorplans: OwnerMediaItem[];
   backgrounds: OwnerMediaItem[];
   contactVideos: OwnerMediaItem[];
@@ -127,6 +128,7 @@ const initialDraft: Draft = blankDraft();
 const emptyMediaState: OwnerMediaState = {
   hero: [],
   photos: [],
+  photoSpaceOrder: [],
   floorplans: [],
   backgrounds: [],
   contactVideos: [],
@@ -235,6 +237,10 @@ function reorderItems(list: OwnerMediaItem[], from: number, to: number) {
 function photoSpaceName(item: OwnerMediaItem) {
   const value = String(item.space ?? "").trim();
   return value || PHOTO_SPACE_FALLBACK;
+}
+
+function normalizeRoomName(value: string) {
+  return String(value ?? "").trim();
 }
 
 function toLocalDateTimeInput(iso: string) {
@@ -400,6 +406,7 @@ export default function OwnerPage() {
       hero: nextMedia.hero.map((item) => item.objectPath),
       photos: nextMedia.photos.map((item) => item.objectPath),
       photoSpaces,
+      photoSpaceOrder: nextMedia.photoSpaceOrder,
       floorplans: nextMedia.floorplans.map((item) => item.objectPath),
       backgrounds: nextMedia.backgrounds.map((item) => item.objectPath),
       overviewBackdrop: nextMedia.backgrounds[0]?.objectPath || undefined,
@@ -752,9 +759,14 @@ export default function OwnerPage() {
   }
 
   async function assignPhotoSpace(item: OwnerMediaItem, nextSpace: string) {
-    const space = String(nextSpace ?? "").trim();
+    const space = normalizeRoomName(nextSpace);
+    const nextSpaceOrder =
+      space && !media.photoSpaceOrder.some((entry) => entry.toLowerCase() === space.toLowerCase())
+        ? [...media.photoSpaceOrder, space]
+        : media.photoSpaceOrder;
     const nextMedia = {
       ...media,
+      photoSpaceOrder: nextSpaceOrder,
       photos: media.photos.map((photo) =>
         photo.objectPath === item.objectPath
           ? { ...photo, space: space || undefined }
@@ -768,28 +780,56 @@ export default function OwnerPage() {
 
   async function movePhotoSpaceGroup(fromSpace: string, toSpace: string) {
     if (fromSpace === toSpace) return;
-    const groups: { space: string; items: OwnerMediaItem[] }[] = [];
+    const existingSpaces = new Set(
+      media.photos.map((item) => photoSpaceName(item).toLowerCase())
+    );
+    for (const name of media.photoSpaceOrder) {
+      existingSpaces.add(name.toLowerCase());
+    }
+    const orderedRooms = [...media.photoSpaceOrder];
     for (const item of media.photos) {
       const space = photoSpaceName(item);
-      const existing = groups.find((group) => group.space === space);
-      if (existing) {
-        existing.items.push(item);
-      } else {
-        groups.push({ space, items: [item] });
+      if (!orderedRooms.some((entry) => entry.toLowerCase() === space.toLowerCase())) {
+        orderedRooms.push(space);
       }
     }
-
-    const fromIndex = groups.findIndex((group) => group.space === fromSpace);
-    const toIndex = groups.findIndex((group) => group.space === toSpace);
+    const fromIndex = orderedRooms.findIndex((room) => room === fromSpace);
+    const toIndex = orderedRooms.findIndex((room) => room === toSpace);
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
 
-    const reordered = [...groups];
-    const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, moved);
+    const nextSpaceOrder = [...orderedRooms];
+    const [movedRoom] = nextSpaceOrder.splice(fromIndex, 1);
+    nextSpaceOrder.splice(toIndex, 0, movedRoom);
+
+    const roomOrderIndex = new Map(
+      nextSpaceOrder.map((room, index) => [room.toLowerCase(), index])
+    );
+    const nextPhotos = [...media.photos].sort((a, b) => {
+      const roomA = photoSpaceName(a).toLowerCase();
+      const roomB = photoSpaceName(b).toLowerCase();
+      return (roomOrderIndex.get(roomA) ?? Number.MAX_SAFE_INTEGER) -
+        (roomOrderIndex.get(roomB) ?? Number.MAX_SAFE_INTEGER);
+    });
 
     const nextMedia = {
       ...media,
-      photos: reordered.flatMap((group) => group.items)
+      photoSpaceOrder: nextSpaceOrder,
+      photos: nextPhotos
+    };
+    setMedia(nextMedia);
+    setMediaDirty(true);
+    await persistMedia(nextMedia, false);
+  }
+
+  async function addPhotoSpace(spaceRaw: string) {
+    const space = normalizeRoomName(spaceRaw);
+    if (!space) return;
+    if (media.photoSpaceOrder.some((entry) => entry.toLowerCase() === space.toLowerCase())) {
+      return;
+    }
+    const nextMedia = {
+      ...media,
+      photoSpaceOrder: [...media.photoSpaceOrder, space]
     };
     setMedia(nextMedia);
     setMediaDirty(true);
@@ -1223,6 +1263,7 @@ export default function OwnerPage() {
                   title="Photos"
                   folder="photos"
                   items={media.photos}
+                  photoSpaceOrder={media.photoSpaceOrder}
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("photos", index, dir)}
                   onReorder={(from, to) => void reorderMediaItem("photos", from, to)}
@@ -1231,6 +1272,7 @@ export default function OwnerPage() {
                   onMovePhotoSpaceGroup={(fromSpace, toSpace) =>
                     void movePhotoSpaceGroup(fromSpace, toSpace)
                   }
+                  onAddPhotoSpace={(space) => void addPhotoSpace(space)}
                 />
                 <MediaPanel
                   title="Floorplans"
@@ -1382,17 +1424,20 @@ function MediaPanel({
   title,
   folder,
   items,
+  photoSpaceOrder = [],
   busy,
   onMove,
   onReorder,
   onDelete,
   onRename,
   onAssignPhotoSpace,
-  onMovePhotoSpaceGroup
+  onMovePhotoSpaceGroup,
+  onAddPhotoSpace
 }: {
   title: string;
   folder: MediaFolder;
   items: OwnerMediaItem[];
+  photoSpaceOrder?: string[];
   busy: boolean;
   onMove: (index: number, direction: -1 | 1) => void;
   onReorder: (from: number, to: number) => void;
@@ -1400,6 +1445,7 @@ function MediaPanel({
   onRename?: (item: OwnerMediaItem, label: string) => void;
   onAssignPhotoSpace?: (item: OwnerMediaItem, space: string) => void;
   onMovePhotoSpaceGroup?: (fromSpace: string, toSpace: string) => void;
+  onAddPhotoSpace?: (space: string) => void;
 }) {
   const isPhotoPanel = folder === "photos";
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -1408,8 +1454,8 @@ function MediaPanel({
   const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({});
   const [spaceDragName, setSpaceDragName] = useState<string | null>(null);
   const [spaceDropName, setSpaceDropName] = useState<string | null>(null);
-  const spaceHandleDragName = useRef<string | null>(null);
   const spaceListId = useId();
+  const [newRoomValue, setNewRoomValue] = useState("");
 
   const groupedPhotos = useMemo(() => {
     const groups: { space: string; items: { item: OwnerMediaItem; index: number }[] }[] = [];
@@ -1422,8 +1468,22 @@ function MediaPanel({
         groups.push({ space, items: [{ item, index }] });
       }
     });
-    return groups;
-  }, [items]);
+    const byRoom = new Map(groups.map((group) => [group.space.toLowerCase(), group]));
+    const ordered: { space: string; items: { item: OwnerMediaItem; index: number }[] }[] = [];
+    for (const room of photoSpaceOrder) {
+      const key = room.toLowerCase();
+      if (byRoom.has(key)) {
+        ordered.push(byRoom.get(key)!);
+      } else {
+        ordered.push({ space: room, items: [] });
+      }
+      byRoom.delete(key);
+    }
+    for (const group of groups) {
+      if (byRoom.has(group.space.toLowerCase())) ordered.push(group);
+    }
+    return ordered;
+  }, [items, photoSpaceOrder]);
   const existingPhotoSpaces = useMemo(
     () =>
       isPhotoPanel
@@ -1465,18 +1525,18 @@ function MediaPanel({
     setCollapsedSpaces((prev) => ({ ...prev, [space]: !prev[space] }));
   }
 
+  function onAddRoomSubmit() {
+    if (!onAddPhotoSpace) return;
+    const value = normalizeRoomName(newRoomValue);
+    if (!value) return;
+    onAddPhotoSpace(value);
+    setNewRoomValue("");
+  }
+
   function renderItemRow(item: OwnerMediaItem, index: number) {
     return (
       <li
         key={item.objectPath}
-        draggable={!busy}
-        onDragStart={(e) => {
-          if (busy || handleDragIndex.current !== index) {
-            e.preventDefault();
-            return;
-          }
-          setDragIndex(index);
-        }}
         onDragOver={(e) => {
           if (busy) return;
           e.preventDefault();
@@ -1507,12 +1567,26 @@ function MediaPanel({
             <button
               type="button"
               aria-label={`Drag ${item.name}`}
+              draggable={!busy}
               disabled={busy}
               onMouseDown={() => {
                 handleDragIndex.current = index;
               }}
               onTouchStart={() => {
                 handleDragIndex.current = index;
+              }}
+              onDragStart={(e) => {
+                if (busy) {
+                  e.preventDefault();
+                  return;
+                }
+                setDragIndex(index);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragEnd={() => {
+                setDragIndex(null);
+                setDropIndex(null);
+                handleDragIndex.current = null;
               }}
               className="mt-1 inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -1617,20 +1691,35 @@ function MediaPanel({
               <option key={space} value={space} />
             ))}
           </datalist>
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-ink-200 bg-ink-50/70 p-3">
+            <p className="text-xs font-semibold text-ink-800">Add Room</p>
+            <input
+              list={spaceListId}
+              value={newRoomValue}
+              onChange={(e) => setNewRoomValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                onAddRoomSubmit();
+              }}
+              placeholder="Type room name"
+              className="h-9 min-w-[220px] flex-1 rounded-lg border border-ink-200 px-2 text-xs"
+            />
+            <button
+              type="button"
+              onClick={onAddRoomSubmit}
+              disabled={!newRoomValue.trim() || busy}
+              className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
+            >
+              Add Room
+            </button>
+          </div>
           <ul className="mt-3 space-y-3">
             {groupedPhotos.map((group) => {
             const collapsed = Boolean(collapsedSpaces[group.space]);
             return (
               <li
                 key={group.space}
-                draggable={!busy}
-                onDragStart={(e) => {
-                  if (busy || spaceHandleDragName.current !== group.space) {
-                    e.preventDefault();
-                    return;
-                  }
-                  setSpaceDragName(group.space);
-                }}
                 onDragOver={(e) => {
                   if (busy) return;
                   e.preventDefault();
@@ -1652,7 +1741,6 @@ function MediaPanel({
                 onDragEnd={() => {
                   setSpaceDragName(null);
                   setSpaceDropName(null);
-                  spaceHandleDragName.current = null;
                 }}
                 className={`rounded-xl border p-3 ${
                   spaceDropName === group.space ? "border-ink-300 bg-ink-50" : "border-ink-100"
@@ -1662,12 +1750,19 @@ function MediaPanel({
                   <button
                     type="button"
                     aria-label={`Drag room ${group.space}`}
+                    draggable={!busy}
                     disabled={busy}
-                    onMouseDown={() => {
-                      spaceHandleDragName.current = group.space;
+                    onDragStart={(e) => {
+                      if (busy) {
+                        e.preventDefault();
+                        return;
+                      }
+                      setSpaceDragName(group.space);
+                      e.dataTransfer.effectAllowed = "move";
                     }}
-                    onTouchStart={() => {
-                      spaceHandleDragName.current = group.space;
+                    onDragEnd={() => {
+                      setSpaceDragName(null);
+                      setSpaceDropName(null);
                     }}
                     className="inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
                   >

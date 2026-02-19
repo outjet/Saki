@@ -33,6 +33,7 @@ export type PropertyMedia = {
   hero?: string[];
   photos?: string[];
   photoSpaces?: Record<string, string>;
+  photoSpaceOrder?: string[];
   floorplans?: string[];
   backgrounds?: string[];
   overviewBackdrop?: string;

@@ -32,6 +32,7 @@ type UpdatePayload = {
     hero?: string[];
     photos?: string[];
     photoSpaces?: Record<string, string>;
+    photoSpaceOrder?: string[];
     floorplans?: string[];
     backgrounds?: string[];
     overviewBackdrop?: string;
@@ -112,6 +113,20 @@ function normalizePhotoSpaces(
     if (!path || !space || !isPathInFolder(slug, "photos", path)) continue;
     if (allowedSet && !allowedSet.has(path)) continue;
     out[path] = space;
+  }
+  return out;
+}
+
+function normalizePhotoSpaceOrder(order: unknown) {
+  if (!Array.isArray(order)) return [] as string[];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of order) {
+    const value = String(raw ?? "").trim();
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
   }
   return out;
 }
@@ -273,6 +288,7 @@ export async function GET(req: Request) {
       media.photoSpaces,
       orderedPhotoPaths
     );
+    const photoSpaceOrder = normalizePhotoSpaceOrder(media.photoSpaceOrder);
     const orderedFloorPaths = mergeOrdered(
       floorplanItems.map((item) => item.objectPath),
       floorplanOrder
@@ -323,6 +339,7 @@ export async function GET(req: Request) {
             return space ? { ...item, space } : item;
           })
           .filter(Boolean),
+        photoSpaceOrder,
         floorplans: orderedFloorPaths.map((path) => byPath.get(path)).filter(Boolean),
         backgrounds: orderedBackgroundPaths.map((path) => byPath.get(path)).filter(Boolean),
         contactVideos: orderedContactVideoPaths.map((path) => byPath.get(path)).filter(Boolean),
@@ -355,6 +372,7 @@ export async function POST(req: Request) {
     hero: normalizePathList(slug, "hero", body?.media?.hero),
     photos: normalizePathList(slug, "photos", body?.media?.photos),
     photoSpaces: {} as Record<string, string>,
+    photoSpaceOrder: normalizePhotoSpaceOrder(body?.media?.photoSpaceOrder),
     floorplans: normalizePathList(slug, "floorplans", body?.media?.floorplans),
     backgrounds: normalizePathList(slug, "backgrounds", body?.media?.backgrounds),
     contactVideos: normalizePathList(slug, "contactvideo", body?.media?.contactVideos),
@@ -426,6 +444,7 @@ export async function DELETE(req: Request) {
         (Array.isArray(media.photos) ? media.photos : []).filter((p: string) => p !== objectPath)
       );
       const nextPhotoSpaces = normalizePhotoSpaces(slug, media.photoSpaces, nextPhotos);
+      const nextPhotoSpaceOrder = normalizePhotoSpaceOrder(media.photoSpaceOrder);
       const nextFloorplans = normalizePathList(
         slug,
         "floorplans",
@@ -461,6 +480,7 @@ export async function DELETE(req: Request) {
             hero: nextHero,
             photos: nextPhotos,
             photoSpaces: nextPhotoSpaces,
+            photoSpaceOrder: nextPhotoSpaceOrder,
             floorplans: nextFloorplans,
             backgrounds: nextBackgrounds,
             overviewBackdrop: nextBackgrounds[0] || null,
