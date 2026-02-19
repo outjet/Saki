@@ -11,7 +11,10 @@ const montserrat = Montserrat({
 
 export const metadata: Metadata = {
   title: "Saki Properties",
-  description: "A modern property listing experience."
+  description: "A modern property listing experience.",
+  icons: {
+    icon: "/favicon.svg"
+  }
 };
 
 type FirebasePublicConfig = {

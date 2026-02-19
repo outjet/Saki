@@ -305,6 +305,11 @@ export default async function PropertyPage({
       <footer className="border-t border-ink-100">
         <div className="container-page py-10 text-sm text-ink-600">
           <p>© {new Date().getFullYear()} outjet productions</p>
+          <p className="mt-2">
+            <a className="font-medium text-ink-700 hover:text-ink-900" href="/owner">
+              Owner login to manage this listing
+            </a>
+          </p>
         </div>
       </footer>
     </main>
