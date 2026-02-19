@@ -75,7 +75,7 @@ export default async function PropertyPage({
   return (
     <main>
       <HeroKenBurns images={heroImages} title={addressLine} />
-      <StickyNav items={nav} />
+      <StickyNav items={nav} overlay />
       <DetailsBar property={property} />
 
       <section className="relative py-10 sm:py-12">

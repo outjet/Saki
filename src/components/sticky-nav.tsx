@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type StickyNavItem = { id: string; label: string };
 
-export function StickyNav({ items }: { items: StickyNavItem[] }) {
+export function StickyNav({
+  items,
+  overlay = false
+}: {
+  items: StickyNavItem[];
+  overlay?: boolean;
+}) {
   const ids = useMemo(() => items.map((i) => i.id), [items]);
   const [activeId, setActiveId] = useState(ids[0] ?? "");
+  const [scrolled, setScrolled] = useState(false);
+  const [navHeight, setNavHeight] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const targets = ids
@@ -31,30 +40,66 @@ export function StickyNav({ items }: { items: StickyNavItem[] }) {
     return () => observer.disconnect();
   }, [ids]);
 
+  useEffect(() => {
+    if (!overlay) return;
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [overlay]);
+
+  useEffect(() => {
+    if (!overlay) return;
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const update = () => setNavHeight(el.offsetHeight);
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [overlay, items.length]);
+
+  const wrapperClassName = overlay
+    ? [
+        "fixed inset-x-0 top-0 z-40 transition",
+        scrolled ? "border-b border-ink-100 glass" : "border-b border-transparent bg-transparent"
+      ].join(" ")
+    : "sticky top-0 z-30 border-b border-ink-100 glass";
+
+  const linkInactiveClassName = overlay && !scrolled
+    ? "text-white/85 hover:bg-white/10 hover:text-white"
+    : "text-ink-700 hover:bg-ink-50 hover:text-ink-950";
+
+  const linkActiveClassName = overlay && !scrolled
+    ? "bg-white text-ink-950"
+    : "bg-ink-950 text-white";
+
   return (
-    <div className="sticky top-0 z-30 border-b border-ink-100 glass">
-      <div className="container-page">
-        <nav className="flex gap-1 overflow-auto py-3">
-          {items.map((item) => {
-            const active = item.id === activeId;
-            return (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className={[
-                  "whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition",
-                  active
-                    ? "bg-ink-950 text-white"
-                    : "text-ink-700 hover:bg-ink-50 hover:text-ink-950"
-                ].join(" ")}
-              >
-                {item.label}
-              </a>
-            );
-          })}
-        </nav>
+    <>
+      {overlay ? <div aria-hidden="true" style={{ height: navHeight }} /> : null}
+      <div ref={wrapperRef} className={wrapperClassName}>
+        <div className="container-page">
+          <nav className="flex gap-1 overflow-auto py-3">
+            {items.map((item) => {
+              const active = item.id === activeId;
+              return (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  className={[
+                    "whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition",
+                    active ? linkActiveClassName : linkInactiveClassName
+                  ].join(" ")}
+                >
+                  {item.label}
+                </a>
+              );
+            })}
+          </nav>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
-

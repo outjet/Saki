@@ -44,6 +44,11 @@ body {
   margin-left: calc(50% - 50vw);
 }
 
+/* Only add the border to the details full-bleed section. */
+#details.full-bleed {
+  border: 1px solid slategray;
+}
+
 /* Ken Burns hero slideshow */
 @keyframes heroFade {
   0% {
