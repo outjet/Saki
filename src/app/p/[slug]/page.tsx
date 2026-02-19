@@ -307,7 +307,7 @@ export default async function PropertyPage({
           <p>© {new Date().getFullYear()} outjet productions</p>
           <p className="mt-2">
             <a className="font-medium text-ink-700 hover:text-ink-900" href="/owner">
-              Owner login to manage this listing
+              Owner login
             </a>
           </p>
         </div>

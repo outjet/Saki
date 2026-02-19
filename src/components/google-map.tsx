@@ -87,7 +87,7 @@ export function GoogleMap({
     });
 
     mapRef.current = map;
-  }, [ready, mapElementId, lat, lon, zoom, mapTypeId, mapStyle, markerTitle]);
+  }, [ready, mapElementId, lat, lon, zoom, mapTypeId, mapStyle, markerTitle, mapId]);
 
   // Update scrollwheel dynamically after map exists
   useEffect(() => {

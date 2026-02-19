@@ -464,22 +464,21 @@ export default function OwnerPage() {
       setMedia(data.media);
       setMediaDirty(false);
       if (showMessage) setStatusMessage("Media refreshed from Storage.");
+      return data.media;
     } catch (e) {
       setStatusMessage(e instanceof Error ? e.message : "Failed to load media");
+      return null;
     } finally {
       setMediaBusy(false);
     }
   }, []);
 
-  async function persistMedia(nextMedia: OwnerMediaState) {
-    const token = await getToken();
-    if (!token) return false;
-    const slug = safeSlug(draft.slug);
-    if (!slug) {
-      setStatusMessage("Set a slug first.");
-      return false;
-    }
-
+  async function persistMediaWithToken(
+    token: string,
+    slug: string,
+    nextMedia: OwnerMediaState,
+    showMessage = true
+  ) {
     setMediaBusy(true);
     try {
       const res = await fetch("/api/admin/media", {
@@ -492,7 +491,7 @@ export default function OwnerPage() {
         throw new Error(data?.error || raw || "Failed to save media order");
       }
       setMediaDirty(false);
-      setStatusMessage("Media order saved.");
+      if (showMessage) setStatusMessage("Media order saved.");
       return true;
     } catch (e) {
       setStatusMessage(e instanceof Error ? e.message : "Failed to save media order");
@@ -500,6 +499,17 @@ export default function OwnerPage() {
     } finally {
       setMediaBusy(false);
     }
+  }
+
+  async function persistMedia(nextMedia: OwnerMediaState, showMessage = true) {
+    const token = await getToken();
+    if (!token) return false;
+    const slug = safeSlug(draft.slug);
+    if (!slug) {
+      setStatusMessage("Set a slug first.");
+      return false;
+    }
+    return persistMediaWithToken(token, slug, nextMedia, showMessage);
   }
 
   async function saveListing() {
@@ -607,7 +617,10 @@ export default function OwnerPage() {
         }
       }
 
-      await loadMedia();
+      const loadedMedia = await loadMediaWithToken(token, slug);
+      if (loadedMedia) {
+        await persistMediaWithToken(token, slug, loadedMedia, false);
+      }
       setStatusMessage(`Uploaded ${files.length} file(s) to ${folder}.`);
     } catch (e) {
       setStatusMessage(e instanceof Error ? e.message : "Upload failed");
@@ -674,6 +687,39 @@ export default function OwnerPage() {
                 : { ...media, docs: reordered };
     setMedia(nextMedia);
     setMediaDirty(true);
+    await persistMedia(nextMedia, false);
+  }
+
+  async function reorderMediaItem(folder: MediaFolder, from: number, to: number) {
+    const list =
+      folder === "contactvideo"
+        ? media.contactVideos
+        : folder === "hero"
+          ? media.hero
+          : folder === "photos"
+            ? media.photos
+            : folder === "floorplans"
+              ? media.floorplans
+              : folder === "backgrounds"
+                ? media.backgrounds
+                : media.docs;
+    const reordered = reorderItems(list, from, to);
+    if (reordered === list) return;
+    const nextMedia =
+      folder === "contactvideo"
+        ? { ...media, contactVideos: reordered }
+        : folder === "hero"
+          ? { ...media, hero: reordered }
+          : folder === "photos"
+            ? { ...media, photos: reordered }
+            : folder === "floorplans"
+              ? { ...media, floorplans: reordered }
+              : folder === "backgrounds"
+                ? { ...media, backgrounds: reordered }
+                : { ...media, docs: reordered };
+    setMedia(nextMedia);
+    setMediaDirty(true);
+    await persistMedia(nextMedia, false);
   }
 
   async function renameDocument(item: OwnerMediaItem, label: string) {
@@ -687,6 +733,7 @@ export default function OwnerPage() {
     };
     setMedia(nextMedia);
     setMediaDirty(true);
+    await persistMedia(nextMedia, false);
   }
 
   const propertyJson = useMemo(() => {
@@ -1077,6 +1124,7 @@ export default function OwnerPage() {
                   items={media.backgrounds}
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("backgrounds", index, dir)}
+                  onReorder={(from, to) => void reorderMediaItem("backgrounds", from, to)}
                   onDelete={(item) => void deleteMediaItem("backgrounds", item)}
                 />
                 <MediaPanel
@@ -1085,6 +1133,7 @@ export default function OwnerPage() {
                   items={media.contactVideos}
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("contactvideo", index, dir)}
+                  onReorder={(from, to) => void reorderMediaItem("contactvideo", from, to)}
                   onDelete={(item) => void deleteMediaItem("contactvideo", item)}
                 />
                 <MediaPanel
@@ -1093,6 +1142,7 @@ export default function OwnerPage() {
                   items={media.hero}
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("hero", index, dir)}
+                  onReorder={(from, to) => void reorderMediaItem("hero", from, to)}
                   onDelete={(item) => void deleteMediaItem("hero", item)}
                 />
                 <MediaPanel
@@ -1101,6 +1151,7 @@ export default function OwnerPage() {
                   items={media.photos}
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("photos", index, dir)}
+                  onReorder={(from, to) => void reorderMediaItem("photos", from, to)}
                   onDelete={(item) => void deleteMediaItem("photos", item)}
                 />
                 <MediaPanel
@@ -1109,6 +1160,7 @@ export default function OwnerPage() {
                   items={media.floorplans}
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("floorplans", index, dir)}
+                  onReorder={(from, to) => void reorderMediaItem("floorplans", from, to)}
                   onDelete={(item) => void deleteMediaItem("floorplans", item)}
                 />
                 <MediaPanel
@@ -1117,6 +1169,7 @@ export default function OwnerPage() {
                   items={media.docs}
                   busy={mediaBusy}
                   onMove={(index, dir) => void moveMediaItem("docs", index, dir)}
+                  onReorder={(from, to) => void reorderMediaItem("docs", from, to)}
                   onDelete={(item) => void deleteMediaItem("docs", item)}
                   onRename={(item, label) => void renameDocument(item, label)}
                 />
@@ -1232,6 +1285,7 @@ function MediaPanel({
   items,
   busy,
   onMove,
+  onReorder,
   onDelete,
   onRename
 }: {
@@ -1240,9 +1294,12 @@ function MediaPanel({
   items: OwnerMediaItem[];
   busy: boolean;
   onMove: (index: number, direction: -1 | 1) => void;
+  onReorder: (from: number, to: number) => void;
   onDelete: (item: OwnerMediaItem) => void;
   onRename?: (item: OwnerMediaItem, label: string) => void;
 }) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
   return (
     <div className="rounded-xl border border-ink-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
@@ -1258,7 +1315,27 @@ function MediaPanel({
       {items.length > 0 ? (
         <ul className="mt-3 grid gap-3 sm:grid-cols-2">
           {items.map((item, index) => (
-            <li key={item.objectPath} className="rounded-xl border border-ink-100 p-3">
+            <li
+              key={item.objectPath}
+              draggable={!busy}
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={(e) => {
+                if (!busy) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (busy || dragIndex == null || dragIndex === index) {
+                  setDragIndex(null);
+                  return;
+                }
+                onReorder(dragIndex, index);
+                setDragIndex(null);
+              }}
+              onDragEnd={() => setDragIndex(null)}
+              className={`rounded-xl border p-3 ${
+                dragIndex === index ? "border-ink-300 bg-ink-50" : "border-ink-100"
+              }`}
+            >
               <div className="flex gap-3">
                 {isImageItem(item) ? (
                   // eslint-disable-next-line @next/next/no-img-element
