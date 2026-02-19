@@ -665,6 +665,70 @@ export default function OwnerPage() {
     }
   }
 
+  async function uploadFilesToPhotoSpace(spaceRaw: string, files: FileList) {
+    const token = await getToken();
+    if (!token) return;
+
+    const slug = safeSlug(draft.slug);
+    if (!slug) {
+      setStatusMessage("Set a slug first.");
+      return;
+    }
+
+    const space = normalizeRoomName(spaceRaw);
+    const beforePaths = new Set(media.photos.map((item) => item.objectPath));
+
+    setMediaBusy(true);
+    try {
+      const fileList = Array.from(files);
+      for (const [index, file] of fileList.entries()) {
+        setStatusMessage(`Uploading ${index + 1}/${fileList.length}: ${file.name}`);
+        const form = new FormData();
+        form.set("slug", slug);
+        form.set("folder", "photos");
+        form.set("file", file, file.name);
+
+        const uploadRes = await fetch("/api/admin/upload", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}` },
+          body: form
+        });
+        const uploadBody = await readResponse<{ ok?: boolean; error?: string }>(uploadRes);
+        if (!uploadRes.ok || !uploadBody.data?.ok) {
+          throw new Error(uploadBody.data?.error || uploadBody.raw || "Upload failed");
+        }
+      }
+
+      const loadedMedia = await loadMediaWithToken(token, slug);
+      if (loadedMedia) {
+        const nextMedia = {
+          ...loadedMedia,
+          photoSpaceOrder:
+            space &&
+            !loadedMedia.photoSpaceOrder.some((entry) => entry.toLowerCase() === space.toLowerCase())
+              ? [...loadedMedia.photoSpaceOrder, space]
+              : loadedMedia.photoSpaceOrder,
+          photos: loadedMedia.photos.map((item) =>
+            !beforePaths.has(item.objectPath) && space
+              ? { ...item, space }
+              : item
+          )
+        };
+        setMedia(nextMedia);
+        await persistMediaWithToken(token, slug, nextMedia, false);
+      }
+      setStatusMessage(
+        space
+          ? `Uploaded ${files.length} file(s) to photos (${space}).`
+          : `Uploaded ${files.length} file(s) to photos.`
+      );
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setMediaBusy(false);
+    }
+  }
+
   async function deleteMediaItem(folder: MediaFolder, item: OwnerMediaItem) {
     const token = await getToken();
     if (!token) return;
@@ -1273,6 +1337,9 @@ export default function OwnerPage() {
                     void movePhotoSpaceGroup(fromSpace, toSpace)
                   }
                   onAddPhotoSpace={(space) => void addPhotoSpace(space)}
+                  onDropFilesToPhotoSpace={(space, files) =>
+                    void uploadFilesToPhotoSpace(space, files)
+                  }
                 />
                 <MediaPanel
                   title="Floorplans"
@@ -1432,7 +1499,8 @@ function MediaPanel({
   onRename,
   onAssignPhotoSpace,
   onMovePhotoSpaceGroup,
-  onAddPhotoSpace
+  onAddPhotoSpace,
+  onDropFilesToPhotoSpace
 }: {
   title: string;
   folder: MediaFolder;
@@ -1446,6 +1514,7 @@ function MediaPanel({
   onAssignPhotoSpace?: (item: OwnerMediaItem, space: string) => void;
   onMovePhotoSpaceGroup?: (fromSpace: string, toSpace: string) => void;
   onAddPhotoSpace?: (space: string) => void;
+  onDropFilesToPhotoSpace?: (space: string, files: FileList) => void;
 }) {
   const isPhotoPanel = folder === "photos";
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -1727,12 +1796,33 @@ function MediaPanel({
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  if (
-                    !busy &&
-                    spaceDragName &&
-                    spaceDragName !== group.space &&
-                    onMovePhotoSpaceGroup
-                  ) {
+                  if (busy) {
+                    setSpaceDragName(null);
+                    setSpaceDropName(null);
+                    setDragIndex(null);
+                    setDropIndex(null);
+                    return;
+                  }
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    if (onDropFilesToPhotoSpace) {
+                      onDropFilesToPhotoSpace(group.space, e.dataTransfer.files);
+                    }
+                    setSpaceDragName(null);
+                    setSpaceDropName(null);
+                    setDragIndex(null);
+                    setDropIndex(null);
+                    return;
+                  }
+                  if (dragIndex != null && onAssignPhotoSpace) {
+                    const dragged = items[dragIndex];
+                    if (dragged) onAssignPhotoSpace(dragged, group.space);
+                    setDragIndex(null);
+                    setDropIndex(null);
+                    setSpaceDragName(null);
+                    setSpaceDropName(null);
+                    return;
+                  }
+                  if (spaceDragName && spaceDragName !== group.space && onMovePhotoSpaceGroup) {
                     onMovePhotoSpaceGroup(spaceDragName, group.space);
                   }
                   setSpaceDragName(null);
