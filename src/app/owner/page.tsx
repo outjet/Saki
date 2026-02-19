@@ -47,6 +47,7 @@ type OwnerMediaItem = {
   size?: string | number;
   updated?: string;
   label?: string;
+  space?: string;
 };
 
 type OwnerMediaState = {
@@ -132,6 +133,22 @@ const emptyMediaState: OwnerMediaState = {
   docs: []
 };
 
+const PHOTO_SPACE_FALLBACK = "Unassigned";
+const PHOTO_SPACE_SUGGESTIONS = [
+  "Front yard",
+  "Back yard",
+  "Kitchen",
+  "Living room",
+  "Dining room",
+  "Primary bedroom",
+  "Bedroom 2",
+  "Bedroom 3",
+  "Bathroom",
+  "Garage",
+  "Office",
+  "Laundry"
+];
+
 function safeSlug(value: string) {
   return value
     .trim()
@@ -213,6 +230,11 @@ function reorderItems(list: OwnerMediaItem[], from: number, to: number) {
   const [moved] = next.splice(from, 1);
   next.splice(to, 0, moved);
   return next;
+}
+
+function photoSpaceName(item: OwnerMediaItem) {
+  const value = String(item.space ?? "").trim();
+  return value || PHOTO_SPACE_FALLBACK;
 }
 
 function toLocalDateTimeInput(iso: string) {
@@ -368,9 +390,16 @@ export default function OwnerPage() {
   }, []);
 
   function mediaManifest(nextMedia: OwnerMediaState) {
+    const photoSpaces = nextMedia.photos.reduce<Record<string, string>>((acc, item) => {
+      const space = String(item.space ?? "").trim();
+      if (space) acc[item.objectPath] = space;
+      return acc;
+    }, {});
+
     return {
       hero: nextMedia.hero.map((item) => item.objectPath),
       photos: nextMedia.photos.map((item) => item.objectPath),
+      photoSpaces,
       floorplans: nextMedia.floorplans.map((item) => item.objectPath),
       backgrounds: nextMedia.backgrounds.map((item) => item.objectPath),
       overviewBackdrop: nextMedia.backgrounds[0]?.objectPath || undefined,
@@ -717,6 +746,51 @@ export default function OwnerPage() {
               : folder === "backgrounds"
                 ? { ...media, backgrounds: reordered }
                 : { ...media, docs: reordered };
+    setMedia(nextMedia);
+    setMediaDirty(true);
+    await persistMedia(nextMedia, false);
+  }
+
+  async function assignPhotoSpace(item: OwnerMediaItem, nextSpace: string) {
+    const space = String(nextSpace ?? "").trim();
+    const nextMedia = {
+      ...media,
+      photos: media.photos.map((photo) =>
+        photo.objectPath === item.objectPath
+          ? { ...photo, space: space || undefined }
+          : photo
+      )
+    };
+    setMedia(nextMedia);
+    setMediaDirty(true);
+    await persistMedia(nextMedia, false);
+  }
+
+  async function movePhotoSpaceGroup(fromSpace: string, toSpace: string) {
+    if (fromSpace === toSpace) return;
+    const groups: { space: string; items: OwnerMediaItem[] }[] = [];
+    for (const item of media.photos) {
+      const space = photoSpaceName(item);
+      const existing = groups.find((group) => group.space === space);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        groups.push({ space, items: [item] });
+      }
+    }
+
+    const fromIndex = groups.findIndex((group) => group.space === fromSpace);
+    const toIndex = groups.findIndex((group) => group.space === toSpace);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+
+    const reordered = [...groups];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    const nextMedia = {
+      ...media,
+      photos: reordered.flatMap((group) => group.items)
+    };
     setMedia(nextMedia);
     setMediaDirty(true);
     await persistMedia(nextMedia, false);
@@ -1153,6 +1227,10 @@ export default function OwnerPage() {
                   onMove={(index, dir) => void moveMediaItem("photos", index, dir)}
                   onReorder={(from, to) => void reorderMediaItem("photos", from, to)}
                   onDelete={(item) => void deleteMediaItem("photos", item)}
+                  onAssignPhotoSpace={(item, space) => void assignPhotoSpace(item, space)}
+                  onMovePhotoSpaceGroup={(fromSpace, toSpace) =>
+                    void movePhotoSpaceGroup(fromSpace, toSpace)
+                  }
                 />
                 <MediaPanel
                   title="Floorplans"
@@ -1308,7 +1386,9 @@ function MediaPanel({
   onMove,
   onReorder,
   onDelete,
-  onRename
+  onRename,
+  onAssignPhotoSpace,
+  onMovePhotoSpaceGroup
 }: {
   title: string;
   folder: MediaFolder;
@@ -1318,10 +1398,156 @@ function MediaPanel({
   onReorder: (from: number, to: number) => void;
   onDelete: (item: OwnerMediaItem) => void;
   onRename?: (item: OwnerMediaItem, label: string) => void;
+  onAssignPhotoSpace?: (item: OwnerMediaItem, space: string) => void;
+  onMovePhotoSpaceGroup?: (fromSpace: string, toSpace: string) => void;
 }) {
+  const isPhotoPanel = folder === "photos";
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const handleDragIndex = useRef<number | null>(null);
+  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({});
+  const [spaceDragName, setSpaceDragName] = useState<string | null>(null);
+  const [spaceDropName, setSpaceDropName] = useState<string | null>(null);
+  const spaceHandleDragName = useRef<string | null>(null);
+  const spaceListId = useId();
+
+  const groupedPhotos = useMemo(() => {
+    const groups: { space: string; items: { item: OwnerMediaItem; index: number }[] }[] = [];
+    items.forEach((item, index) => {
+      const space = photoSpaceName(item);
+      const existing = groups.find((group) => group.space === space);
+      if (existing) {
+        existing.items.push({ item, index });
+      } else {
+        groups.push({ space, items: [{ item, index }] });
+      }
+    });
+    return groups;
+  }, [items]);
+
+  function toggleSpace(space: string) {
+    setCollapsedSpaces((prev) => ({ ...prev, [space]: !prev[space] }));
+  }
+
+  function renderItemRow(item: OwnerMediaItem, index: number) {
+    return (
+      <li
+        key={item.objectPath}
+        draggable={!busy}
+        onDragStart={(e) => {
+          if (busy || handleDragIndex.current !== index) {
+            e.preventDefault();
+            return;
+          }
+          setDragIndex(index);
+        }}
+        onDragOver={(e) => {
+          if (busy) return;
+          e.preventDefault();
+          setDropIndex(index);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (busy || dragIndex == null || dragIndex === index) {
+            setDragIndex(null);
+            setDropIndex(null);
+            return;
+          }
+          onReorder(dragIndex, index);
+          setDragIndex(null);
+          setDropIndex(null);
+        }}
+        onDragEnd={() => {
+          setDragIndex(null);
+          setDropIndex(null);
+          handleDragIndex.current = null;
+        }}
+        className={`rounded-xl border p-3 ${
+          dropIndex === index ? "border-ink-300 bg-ink-50" : "border-ink-100"
+        }`}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <button
+              type="button"
+              aria-label={`Drag ${item.name}`}
+              disabled={busy}
+              onMouseDown={() => {
+                handleDragIndex.current = index;
+              }}
+              onTouchStart={() => {
+                handleDragIndex.current = index;
+              }}
+              className="mt-1 inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ::
+            </button>
+            {isImageItem(item) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.signedUrl}
+                alt={item.name}
+                className="h-20 w-28 shrink-0 rounded-lg object-cover sm:h-24 sm:w-32"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-ink-50 text-xs text-ink-600 sm:h-24 sm:w-32">
+                File
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-ink-500">#{index + 1}</p>
+              <p className="truncate text-sm font-medium text-ink-900">{item.name}</p>
+              <p className="truncate text-xs text-ink-600">{item.objectPath}</p>
+              {isPhotoPanel && onAssignPhotoSpace ? (
+                <input
+                  list={spaceListId}
+                  defaultValue={item.space || ""}
+                  placeholder="Assign a space (e.g., Kitchen)"
+                  onBlur={(e) => onAssignPhotoSpace(item, e.target.value)}
+                  className="mt-2 h-9 w-full rounded-lg border border-ink-200 px-2 text-xs"
+                />
+              ) : null}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:ml-auto sm:justify-end">
+            <button
+              type="button"
+              onClick={() => onMove(index, -1)}
+              disabled={busy || index === 0}
+              className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
+            >
+              Up
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(index, 1)}
+              disabled={busy || index === items.length - 1}
+              className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
+            >
+              Down
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(item)}
+              disabled={busy}
+              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-40"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+
+        {folder === "docs" && onRename ? (
+          <input
+            defaultValue={item.label || item.name}
+            onBlur={(e) => onRename(item, e.target.value)}
+            className="mt-3 h-9 w-full rounded-lg border border-ink-200 px-2 text-xs"
+          />
+        ) : null}
+      </li>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-ink-200 bg-white p-4">
@@ -1336,117 +1562,97 @@ function MediaPanel({
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-ink-600">No files yet.</p>
       ) : null}
-      {items.length > 0 ? (
+      {items.length > 0 && !isPhotoPanel ? (
         <ul className="mt-3 space-y-3">
-          {items.map((item, index) => (
-            <li
-              key={item.objectPath}
-              draggable={!busy}
-              onDragStart={(e) => {
-                if (busy || handleDragIndex.current !== index) {
+          {items.map((item, index) => renderItemRow(item, index))}
+        </ul>
+      ) : null}
+      {items.length > 0 && isPhotoPanel ? (
+        <>
+          <datalist id={spaceListId}>
+            {PHOTO_SPACE_SUGGESTIONS.map((space) => (
+              <option key={space} value={space} />
+            ))}
+          </datalist>
+          <ul className="mt-3 space-y-3">
+            {groupedPhotos.map((group) => {
+            const collapsed = Boolean(collapsedSpaces[group.space]);
+            return (
+              <li
+                key={group.space}
+                draggable={!busy}
+                onDragStart={(e) => {
+                  if (busy || spaceHandleDragName.current !== group.space) {
+                    e.preventDefault();
+                    return;
+                  }
+                  setSpaceDragName(group.space);
+                }}
+                onDragOver={(e) => {
+                  if (busy) return;
                   e.preventDefault();
-                  return;
-                }
-                setDragIndex(index);
-              }}
-              onDragOver={(e) => {
-                if (busy) return;
-                e.preventDefault();
-                setDropIndex(index);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (busy || dragIndex == null || dragIndex === index) {
-                  setDragIndex(null);
-                  setDropIndex(null);
-                  return;
-                }
-                onReorder(dragIndex, index);
-                setDragIndex(null);
-                setDropIndex(null);
-              }}
-              onDragEnd={() => {
-                setDragIndex(null);
-                setDropIndex(null);
-                handleDragIndex.current = null;
-              }}
-              className={`rounded-xl border p-3 ${
-                dropIndex === index ? "border-ink-300 bg-ink-50" : "border-ink-100"
-              }`}
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  setSpaceDropName(group.space);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (
+                    !busy &&
+                    spaceDragName &&
+                    spaceDragName !== group.space &&
+                    onMovePhotoSpaceGroup
+                  ) {
+                    onMovePhotoSpaceGroup(spaceDragName, group.space);
+                  }
+                  setSpaceDragName(null);
+                  setSpaceDropName(null);
+                }}
+                onDragEnd={() => {
+                  setSpaceDragName(null);
+                  setSpaceDropName(null);
+                  spaceHandleDragName.current = null;
+                }}
+                className={`rounded-xl border p-3 ${
+                  spaceDropName === group.space ? "border-ink-300 bg-ink-50" : "border-ink-100"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    aria-label={`Drag ${item.name}`}
+                    aria-label={`Drag room ${group.space}`}
                     disabled={busy}
                     onMouseDown={() => {
-                      handleDragIndex.current = index;
+                      spaceHandleDragName.current = group.space;
                     }}
                     onTouchStart={() => {
-                      handleDragIndex.current = index;
+                      spaceHandleDragName.current = group.space;
                     }}
-                    className="mt-1 inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     ::
                   </button>
-                  {isImageItem(item) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.signedUrl}
-                      alt={item.name}
-                      className="h-20 w-28 shrink-0 rounded-lg object-cover sm:h-24 sm:w-32"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-ink-50 text-xs text-ink-600 sm:h-24 sm:w-32">
-                      File
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-ink-500">#{index + 1}</p>
-                    <p className="truncate text-sm font-medium text-ink-900">{item.name}</p>
-                    <p className="truncate text-xs text-ink-600">{item.objectPath}</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleSpace(group.space)}
+                    className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900"
+                  >
+                    {collapsed ? "Expand" : "Collapse"}
+                  </button>
+                  <p className="text-sm font-semibold text-ink-900">{group.space}</p>
+                  <span className="rounded-full bg-ink-100 px-2 py-1 text-xs text-ink-700">
+                    {group.items.length}
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-2 sm:ml-auto sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => onMove(index, -1)}
-                    disabled={busy || index === 0}
-                    className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
-                  >
-                    Up
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onMove(index, 1)}
-                    disabled={busy || index === items.length - 1}
-                    className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
-                  >
-                    Down
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(item)}
-                    disabled={busy}
-                    className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-40"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
 
-              {folder === "docs" && onRename ? (
-                <input
-                  defaultValue={item.label || item.name}
-                  onBlur={(e) => onRename(item, e.target.value)}
-                  className="mt-3 h-9 w-full rounded-lg border border-ink-200 px-2 text-xs"
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
+                {!collapsed ? (
+                  <ul className="mt-3 space-y-3">
+                    {group.items.map(({ item, index }) => renderItemRow(item, index))}
+                  </ul>
+                ) : null}
+              </li>
+            );
+            })}
+          </ul>
+        </>
       ) : null}
     </div>
   );

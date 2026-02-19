@@ -32,6 +32,7 @@ export type PropertyLocation = {
 export type PropertyMedia = {
   hero?: string[];
   photos?: string[];
+  photoSpaces?: Record<string, string>;
   floorplans?: string[];
   backgrounds?: string[];
   overviewBackdrop?: string;
