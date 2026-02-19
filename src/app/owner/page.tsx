@@ -1450,6 +1450,17 @@ function MediaPanel({
     return out;
   }, [existingPhotoSpaces]);
 
+  useEffect(() => {
+    if (!isPhotoPanel) return;
+    setCollapsedSpaces((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const group of groupedPhotos) {
+        next[group.space] = prev[group.space] ?? true;
+      }
+      return next;
+    });
+  }, [groupedPhotos, isPhotoPanel]);
+
   function toggleSpace(space: string) {
     setCollapsedSpaces((prev) => ({ ...prev, [space]: !prev[space] }));
   }
