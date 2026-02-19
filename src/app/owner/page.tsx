@@ -6,7 +6,7 @@ import {
   signInWithPopup,
   signOut
 } from "firebase/auth";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { firebaseAuth } from "@/lib/firebase-client";
 
 type Draft = {
@@ -1214,6 +1214,7 @@ function UploadRow({
   onPick: (files: FileList) => Promise<void>;
 }) {
   const inputId = useId();
+  const [isDragOver, setIsDragOver] = useState(false);
   const [status, setStatus] = useState<
     | { state: "idle" }
     | { state: "picked"; count: number }
@@ -1222,8 +1223,42 @@ function UploadRow({
     | { state: "error"; message: string }
   >({ state: "idle" });
 
+  async function processFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setStatus({ state: "picked", count: files.length });
+    try {
+      setStatus({ state: "uploading", count: files.length });
+      await onPick(files);
+      setStatus({ state: "done", count: files.length });
+    } catch (err) {
+      setStatus({
+        state: "error",
+        message: err instanceof Error ? err.message : "Upload failed"
+      });
+    }
+  }
+
   return (
-    <div className="rounded-xl border border-ink-200 bg-ink-50/70 p-4 min-h-[170px]">
+    <div
+      className={`rounded-xl border p-4 min-h-[170px] transition ${
+        isDragOver ? "border-ink-400 bg-ink-100/80" : "border-ink-200 bg-ink-50/70"
+      }`}
+      onDragEnter={(e) => {
+        if (e.dataTransfer.types.includes("Files")) setIsDragOver(true);
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setIsDragOver(false);
+        void processFiles(e.dataTransfer.files);
+      }}
+    >
       <p className="text-sm font-semibold text-ink-950">{label}</p>
       <p className="mt-1 text-xs text-ink-600">{hint}</p>
       <div className="mt-3 min-h-[1.25rem]">
@@ -1246,22 +1281,8 @@ function UploadRow({
         disabled={status.state === "uploading"}
         onChange={async (e) => {
           const input = e.currentTarget;
-          const files = input.files;
-          if (!files || files.length === 0) return;
-
-          setStatus({ state: "picked", count: files.length });
-          try {
-            setStatus({ state: "uploading", count: files.length });
-            await onPick(files);
-            setStatus({ state: "done", count: files.length });
-          } catch (err) {
-            setStatus({
-              state: "error",
-              message: err instanceof Error ? err.message : "Upload failed"
-            });
-          } finally {
-            input.value = "";
-          }
+          await processFiles(input.files);
+          input.value = "";
         }}
         className="sr-only"
       />
@@ -1273,7 +1294,7 @@ function UploadRow({
         Choose Files
       </label>
       <p className="mt-2 text-xs text-ink-500">
-        Images: JPG, PNG, WEBP, AVIF. Videos: MP4, WEBM, MOV. Docs: PDF.
+        Drag files here or choose files. Images: JPG, PNG, WEBP, AVIF. Videos: MP4, WEBM, MOV. Docs: PDF.
       </p>
     </div>
   );
@@ -1299,6 +1320,8 @@ function MediaPanel({
   onRename?: (item: OwnerMediaItem, label: string) => void;
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const handleDragIndex = useRef<number | null>(null);
 
   return (
     <div className="rounded-xl border border-ink-200 bg-white p-4">
@@ -1308,52 +1331,109 @@ function MediaPanel({
           {items.length}
         </span>
       </div>
+      <p className="mt-1 text-xs text-ink-600">Drag by handle to reorder.</p>
 
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-ink-600">No files yet.</p>
       ) : null}
       {items.length > 0 ? (
-        <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+        <ul className="mt-3 space-y-3">
           {items.map((item, index) => (
             <li
               key={item.objectPath}
               draggable={!busy}
-              onDragStart={() => setDragIndex(index)}
+              onDragStart={(e) => {
+                if (busy || handleDragIndex.current !== index) {
+                  e.preventDefault();
+                  return;
+                }
+                setDragIndex(index);
+              }}
               onDragOver={(e) => {
-                if (!busy) e.preventDefault();
+                if (busy) return;
+                e.preventDefault();
+                setDropIndex(index);
               }}
               onDrop={(e) => {
                 e.preventDefault();
                 if (busy || dragIndex == null || dragIndex === index) {
                   setDragIndex(null);
+                  setDropIndex(null);
                   return;
                 }
                 onReorder(dragIndex, index);
                 setDragIndex(null);
+                setDropIndex(null);
               }}
-              onDragEnd={() => setDragIndex(null)}
+              onDragEnd={() => {
+                setDragIndex(null);
+                setDropIndex(null);
+                handleDragIndex.current = null;
+              }}
               className={`rounded-xl border p-3 ${
-                dragIndex === index ? "border-ink-300 bg-ink-50" : "border-ink-100"
+                dropIndex === index ? "border-ink-300 bg-ink-50" : "border-ink-100"
               }`}
             >
-              <div className="flex gap-3">
-                {isImageItem(item) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.signedUrl}
-                    alt={item.name}
-                    className="h-20 w-28 shrink-0 rounded-lg object-cover sm:h-24 sm:w-32"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-ink-50 text-xs text-ink-600 sm:h-24 sm:w-32">
-                    File
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <button
+                    type="button"
+                    aria-label={`Drag ${item.name}`}
+                    disabled={busy}
+                    onMouseDown={() => {
+                      handleDragIndex.current = index;
+                    }}
+                    onTouchStart={() => {
+                      handleDragIndex.current = index;
+                    }}
+                    className="mt-1 inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ::
+                  </button>
+                  {isImageItem(item) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.signedUrl}
+                      alt={item.name}
+                      className="h-20 w-28 shrink-0 rounded-lg object-cover sm:h-24 sm:w-32"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-ink-50 text-xs text-ink-600 sm:h-24 sm:w-32">
+                      File
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-ink-500">#{index + 1}</p>
+                    <p className="truncate text-sm font-medium text-ink-900">{item.name}</p>
+                    <p className="truncate text-xs text-ink-600">{item.objectPath}</p>
                   </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-ink-500">#{index + 1}</p>
-                  <p className="truncate text-sm font-medium text-ink-900">{item.name}</p>
-                  <p className="truncate text-xs text-ink-600">{item.objectPath}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 sm:ml-auto sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onMove(index, -1)}
+                    disabled={busy || index === 0}
+                    className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMove(index, 1)}
+                    disabled={busy || index === items.length - 1}
+                    className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
+                  >
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(item)}
+                    disabled={busy}
+                    className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-40"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
 
@@ -1361,36 +1441,9 @@ function MediaPanel({
                 <input
                   defaultValue={item.label || item.name}
                   onBlur={(e) => onRename(item, e.target.value)}
-                  className="mt-2 h-9 w-full rounded-lg border border-ink-200 px-2 text-xs"
+                  className="mt-3 h-9 w-full rounded-lg border border-ink-200 px-2 text-xs"
                 />
               ) : null}
-
-              <div className="mt-3 border-t border-ink-100 pt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => onMove(index, -1)}
-                  disabled={busy || index === 0}
-                  className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
-                >
-                  Up
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onMove(index, 1)}
-                  disabled={busy || index === items.length - 1}
-                  className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-900 disabled:opacity-40"
-                >
-                  Down
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(item)}
-                  disabled={busy}
-                  className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-40"
-                >
-                  Delete
-                </button>
-              </div>
             </li>
           ))}
         </ul>
