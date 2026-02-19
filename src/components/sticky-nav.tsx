@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type StickyNavItem = { id: string; label: string };
 
@@ -14,8 +14,6 @@ export function StickyNav({
   const ids = useMemo(() => items.map((i) => i.id), [items]);
   const [activeId, setActiveId] = useState(ids[0] ?? "");
   const [scrolled, setScrolled] = useState(false);
-  const [navHeight, setNavHeight] = useState(0);
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const targets = ids
@@ -48,19 +46,6 @@ export function StickyNav({
     return () => window.removeEventListener("scroll", onScroll);
   }, [overlay]);
 
-  useEffect(() => {
-    if (!overlay) return;
-    const el = wrapperRef.current;
-    if (!el) return;
-
-    const update = () => setNavHeight(el.offsetHeight);
-    update();
-
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [overlay, items.length]);
-
   const wrapperClassName = overlay
     ? [
         "fixed inset-x-0 top-0 z-40 transition",
@@ -78,8 +63,7 @@ export function StickyNav({
 
   return (
     <>
-      {overlay ? <div aria-hidden="true" style={{ height: navHeight }} /> : null}
-      <div ref={wrapperRef} className={wrapperClassName}>
+      <div className={wrapperClassName}>
         <div className="container-page">
           <nav className="flex gap-1 overflow-auto py-3">
             {items.map((item) => {
