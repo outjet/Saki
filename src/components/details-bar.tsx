@@ -108,13 +108,13 @@ function Stat({
 }) {
   return (
     <div className="flex min-w-[130px] flex-1 flex-col items-center px-3 py-4 text-center">
-      <span className="mb-2 inline-flex h-8 w-8 items-center justify-center text-ink-950">
+      <span className="mb-2 inline-flex h-8 w-8 items-center justify-center text-white">
         {icon}
       </span>
-      <span className="text-xl font-semibold tracking-tight text-ink-950">
+      <span className="text-xl font-semibold tracking-tight text-white">
         {count}
       </span>
-      {suffix ? <span className="mt-1 text-xs text-ink-600">{suffix}</span> : null}
+      {suffix ? <span className="mt-1 text-xs text-white/70">{suffix}</span> : null}
     </div>
   );
 }
@@ -128,11 +128,11 @@ export function DetailsBar({ property }: { property: Property }) {
         : "—";
 
   return (
-    <section id="details" className="full-bleed bg-ink-50">
+    <section id="details" className="full-bleed bg-[#2b3c4d]">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:flex-row">
         <div className="text-center lg:text-left">
-          <div className="text-xs font-medium text-ink-600">Offered At</div>
-          <div className="mt-1 text-3xl font-semibold tracking-tight text-ink-950 sm:text-4xl">
+          <div className="text-xs font-medium text-white/70">Offered At</div>
+          <div className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             {formatMoney(property.price)}
           </div>
         </div>
