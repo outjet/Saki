@@ -11,7 +11,6 @@ type GoogleMapProps = {
   mapTypeId?: "roadmap" | "satellite" | "hybrid" | "terrain";
   mapStyle?: unknown;
   markerTitle?: string;
-  mapId?: string;
   mapElementId: string;
 };
 
@@ -23,145 +22,81 @@ export function GoogleMap({
   mapTypeId = "satellite",
   mapStyle,
   markerTitle,
-  mapId,
   mapElementId
 }: GoogleMapProps) {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  const effectiveMapId = mapId ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+
   const [ready, setReady] = useState(false);
-  const [interactive, setInteractive] = useState(true);
-  const mapRef = useRef<unknown>(null);
-  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hoverUnlockDelayMs = 2000;
+  const [scrollZoom, setScrollZoom] = useState(false);
+
+  const mapRef = useRef<any>(null);
 
   const src = useMemo(() => {
     if (!key) return null;
-    const params = new URLSearchParams({
-      v: "3",
-      key,
-      loading: "async",
-      libraries: "marker"
-    });
+    const params = new URLSearchParams({ v: "3", key });
     return `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
   }, [key]);
 
+  // Create map once
   useEffect(() => {
     if (!ready) return;
     if (typeof window === "undefined") return;
-    let cancelled = false;
 
-    void (async () => {
-      const g = (window as unknown as { google?: any }).google;
-      if (!g?.maps) return;
-
-      const el = document.getElementById(mapElementId);
-      if (!el) return;
-      if (mapRef.current) return;
-
-      const center = { lat, lng: lon };
-
-      const mapsLib = g.maps.importLibrary
-        ? await g.maps.importLibrary("maps").catch(() => null)
-        : null;
-      if (cancelled) return;
-
-      const MapCtor = (mapsLib as any)?.Map ?? g.maps.Map;
-      if (typeof MapCtor !== "function") return;
-
-      const map = new MapCtor(el, {
-        center,
-        zoom,
-        mapTypeId,
-        styles: mapStyle as any,
-        ...(effectiveMapId ? { mapId: effectiveMapId } : {}),
-        streetViewControl: true,
-        mapTypeControl: true,
-        fullscreenControl: true,
-        zoomControl: interactive,
-        scaleControl: true,
-        rotateControl: true,
-        scrollwheel: false,
-        draggable: interactive,
-        gestureHandling: interactive ? "greedy" : "none"
-      });
-
-      const markerLib = g.maps.importLibrary
-        ? await g.maps.importLibrary("marker").catch(() => null)
-        : null;
-      if (cancelled) return;
-
-      const AdvancedMarkerElement =
-        (markerLib as any)?.AdvancedMarkerElement ?? g.maps.marker?.AdvancedMarkerElement;
-
-      if (effectiveMapId && typeof AdvancedMarkerElement === "function") {
-        new AdvancedMarkerElement({
-          position: center,
-          map,
-          title: markerTitle
-        });
-      } else if (typeof g.maps.Marker === "function") {
-        new g.maps.Marker({
-          position: center,
-          map,
-          title: markerTitle
-        });
-      }
-
-      mapRef.current = map;
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    effectiveMapId,
-    interactive,
-    lat,
-    lon,
-    mapElementId,
-    mapStyle,
-    mapTypeId,
-    markerTitle,
-    ready,
-    zoom
-  ]);
-
-  useEffect(() => {
-    const g = (window as unknown as { google?: any }).google;
+    const g = (window as any).google;
     if (!g?.maps) return;
-    const map = mapRef.current as any;
-    if (!map?.setOptions) return;
-    map.setOptions({
-      zoomControl: interactive,
+
+    const el = document.getElementById(mapElementId);
+    if (!el) return;
+
+    // If you hot-reload / re-render and the same element is reused,
+    // this prevents creating multiple map instances.
+    if (mapRef.current) return;
+
+    const center = { lat, lng: lon };
+
+    const map = new g.maps.Map(el, {
+      center,
+      zoom,
+      mapTypeId,
+      styles: mapStyle as any,
+
+      // keep the map "normal"
+      streetViewControl: true,
+      mapTypeControl: true,
+      fullscreenControl: true,
+      zoomControl: true,
+      scaleControl: true,
+      rotateControl: true,
+
+      // only protect page scrolling:
       scrollwheel: false,
-      draggable: interactive,
-      gestureHandling: interactive ? "greedy" : "none"
+      // Optional: helps on trackpads/touch. "cooperative" is less hijacky than "greedy".
+      gestureHandling: "cooperative",
+
+      // keep these always enabled
+      draggable: true
     });
-  }, [interactive]);
 
+    new g.maps.Marker({
+      position: center,
+      map,
+      title: markerTitle
+    });
+
+    mapRef.current = map;
+  }, [ready, mapElementId, lat, lon, zoom, mapTypeId, mapStyle, markerTitle]);
+
+  // Update scrollwheel dynamically after map exists
   useEffect(() => {
-    return () => {
-      if (unlockTimerRef.current) {
-        clearTimeout(unlockTimerRef.current);
-        unlockTimerRef.current = null;
-      }
-    };
-  }, []);
+    const map = mapRef.current;
+    if (!map?.setOptions) return;
 
-  function clearUnlockTimer() {
-    if (unlockTimerRef.current) {
-      clearTimeout(unlockTimerRef.current);
-      unlockTimerRef.current = null;
-    }
-  }
-
-  function startHoverUnlockTimer() {
-    if (interactive || unlockTimerRef.current) return;
-    unlockTimerRef.current = setTimeout(() => {
-      setInteractive(true);
-      unlockTimerRef.current = null;
-    }, hoverUnlockDelayMs);
-  }
+    map.setOptions({
+      scrollwheel: scrollZoom,
+      // keep gestureHandling cooperative; enabling scrollwheel is enough
+      gestureHandling: "cooperative"
+    });
+  }, [scrollZoom]);
 
   if (!src) {
     return (
@@ -188,33 +123,17 @@ export function GoogleMap({
   return (
     <>
       <Script src={src} strategy="afterInteractive" onLoad={() => setReady(true)} />
-      <div className="relative" style={{ width: "100%", height: `${heightPx}px`, overflow: "hidden" }}>
+
+      {/* Wrapper captures "intent" without an overlay */}
+      <div
+        style={{ width: "100%", height: `${heightPx}px`, position: "relative", overflow: "hidden" }}
+        onPointerDown={() => setScrollZoom(true)}   // click/tap means "I mean it"
+        onMouseLeave={() => setScrollZoom(false)}   // leaving restores safe scroll
+      >
         <div
           id={mapElementId}
-          className={interactive ? "" : "grayscale opacity-90"}
-          style={{ width: "100%", height: `${heightPx}px` }}
+          style={{ width: "100%", height: "100%" }}
         />
-        {!interactive ? (
-          <button
-            type="button"
-            onClick={() => {
-              clearUnlockTimer();
-              setInteractive(true);
-            }}
-            onMouseEnter={() => {
-              startHoverUnlockTimer();
-            }}
-            onMouseLeave={() => {
-              clearUnlockTimer();
-            }}
-            className="absolute inset-0 z-10 flex w-full items-center justify-center bg-black/5 text-center text-white"
-            aria-label="Enable map interactions"
-          >
-            <span className="rounded-xl bg-black/45 px-4 py-3 text-sm font-medium">
-              Tap to interact with map
-            </span>
-          </button>
-        ) : null}
       </div>
     </>
   );
