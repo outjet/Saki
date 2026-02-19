@@ -129,7 +129,7 @@ export function DetailsBar({ property }: { property: Property }) {
 
   return (
     <section id="details" className="full-bleed bg-ink-50">
-      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-8 px-4 sm:px-6 lg:flex-row">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:flex-row">
         <div className="text-center lg:text-left">
           <div className="text-xs font-medium text-ink-600">Offered At</div>
           <div className="mt-1 text-3xl font-semibold tracking-tight text-ink-950 sm:text-4xl">
