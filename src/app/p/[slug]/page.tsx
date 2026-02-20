@@ -100,14 +100,20 @@ export default async function PropertyPage({
 
               <div className="lg:col-span-4">
                 {property.openHouses && property.openHouses.length > 0 ? (
-                  <div className="rounded-2xl border border-white/25 bg-white/10 p-4">
-                    <h3 className="text-lg font-semibold text-[#ffed14]">
+                  <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-300/30 via-amber-100/20 to-white/10 p-5 shadow-[0_0_0_1px_rgba(255,237,20,0.25),0_18px_40px_rgba(0,0,0,0.3)]">
+                    <p className="inline-flex rounded-full border border-amber-100/80 bg-amber-200 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-950">
+                      Open House
+                    </p>
+                    <h3 className="mt-3 text-xl font-semibold leading-tight text-[#ffed14]">
                       Visit us at our upcoming open house!
                     </h3>
-                    <ul className="mt-3 grid gap-3 text-sm text-white/90">
+                    <ul className="mt-4 grid gap-3 text-sm text-white/95">
                       {property.openHouses.map((oh) => (
-                        <li key={oh.startIso} className="border-t border-white/25 pt-3">
-                          <p className="font-medium">{formatOpenHouse(oh)}</p>
+                        <li
+                          key={oh.startIso}
+                          className="rounded-xl border border-white/25 bg-black/25 px-3 py-2"
+                        >
+                          <p className="text-base font-semibold">{formatOpenHouse(oh)}</p>
                         </li>
                       ))}
                     </ul>
