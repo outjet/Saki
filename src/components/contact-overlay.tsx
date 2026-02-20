@@ -45,7 +45,7 @@ export function ContactOverlay({
   }
 
   return (
-    <section id="contact" className="relative py-10 sm:py-12">
+    <section id="contact" className="relative min-h-[650px] py-10 sm:py-12">
       {contactVideo ? (
         <video
           className="absolute inset-0 h-full w-full object-cover"
@@ -59,8 +59,13 @@ export function ContactOverlay({
           <source src={contactVideo} />
         </video>
       ) : null}
-      <div className="absolute inset-0 bg-black/30" aria-hidden="true" />
-      <div className="relative container-page">
+      <div
+        className={`absolute inset-0 transition-colors duration-300 ${
+          isCollapsed ? "bg-transparent" : "bg-black/30"
+        }`}
+        aria-hidden="true"
+      />
+      <div className="relative container-page flex h-full flex-col">
         <div className="flex justify-end">
           <button
             type="button"
@@ -99,16 +104,6 @@ export function ContactOverlay({
           </div>
         </div>
 
-        <div
-          className={`pt-5 text-center transition-opacity duration-300 ${
-            isCollapsed ? "opacity-100" : "pointer-events-none opacity-0"
-          }`}
-          aria-hidden={!isCollapsed}
-        >
-          <p className="inline-flex rounded-full border border-white/45 bg-black/30 px-4 py-2 text-sm text-white/95">
-            Enjoy the aerial view. Bring the form back any time.
-          </p>
-        </div>
       </div>
     </section>
   );
