@@ -105,7 +105,7 @@ export default async function PropertyPage({
                       Open House
                     </p>
                     <h3 className="mt-3 text-xl font-semibold leading-tight text-[#ffed14]">
-                      Visit us at our upcoming open house!
+                      Visit us at our upcoming Open House!
                     </h3>
                     <ul className="mt-4 grid gap-3 text-sm text-white/95">
                       {property.openHouses.map((oh) => (
