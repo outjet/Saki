@@ -26,6 +26,9 @@ type Draft = {
   agentName: string;
   agentPhone: string;
   agentEmail: string;
+  openHouseCtaText: string;
+  buyerBrokerText: string;
+  contactCtaText: string;
   openHouseIso: string;
   openHouseEndIso: string;
   lat: string;
@@ -93,6 +96,9 @@ type LoadedProperty = {
     email?: string;
   };
   openHouses?: { startIso?: string; endIso?: string }[];
+  openHouseCtaText?: string;
+  buyerBrokerText?: string;
+  contactCtaText?: string;
   location?: { lat?: number; lon?: number };
   media?: {
     video?: PropertyMediaExtras["video"];
@@ -118,6 +124,9 @@ function blankDraft(slug = "23760-emmons-road"): Draft {
     agentName: "",
     agentPhone: "",
     agentEmail: "",
+    openHouseCtaText: "",
+    buyerBrokerText: "",
+    contactCtaText: "",
     openHouseIso: "",
     openHouseEndIso: "",
     lat: "",
@@ -193,6 +202,9 @@ function draftFromProperty(property: LoadedProperty, current: Draft): Draft {
     agentName: asString(property.agent?.name, current.agentName),
     agentPhone: asString(property.agent?.phone, current.agentPhone),
     agentEmail: asString(property.agent?.email, current.agentEmail),
+    openHouseCtaText: asString(property.openHouseCtaText, current.openHouseCtaText),
+    buyerBrokerText: asString(property.buyerBrokerText, current.buyerBrokerText),
+    contactCtaText: asString(property.contactCtaText, current.contactCtaText),
     openHouseIso: asString(property.openHouses?.[0]?.startIso, current.openHouseIso),
     openHouseEndIso: asString(property.openHouses?.[0]?.endIso, current.openHouseEndIso),
     lat:
@@ -588,6 +600,9 @@ export default function OwnerPage() {
         phone: draft.agentPhone || undefined,
         email: draft.agentEmail || undefined
       },
+      openHouseCtaText: draft.openHouseCtaText || undefined,
+      buyerBrokerText: draft.buyerBrokerText || undefined,
+      contactCtaText: draft.contactCtaText || undefined,
       openHouses: draft.openHouseIso
         ? [
             {
@@ -952,6 +967,9 @@ export default function OwnerPage() {
         phone: draft.agentPhone || undefined,
         email: draft.agentEmail || undefined
       },
+      openHouseCtaText: draft.openHouseCtaText || undefined,
+      buyerBrokerText: draft.buyerBrokerText || undefined,
+      contactCtaText: draft.contactCtaText || undefined,
       openHouses: draft.openHouseIso
         ? [
             {
@@ -1224,6 +1242,27 @@ export default function OwnerPage() {
                   <input
                     value={draft.agentEmail}
                     onChange={(e) => setDraft({ ...draft, agentEmail: e.target.value })}
+                    className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
+                  />
+                </Field>
+                <Field label="Open house CTA text">
+                  <input
+                    value={draft.openHouseCtaText}
+                    onChange={(e) => setDraft({ ...draft, openHouseCtaText: e.target.value })}
+                    className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
+                  />
+                </Field>
+                <Field label="Buyer broker text">
+                  <input
+                    value={draft.buyerBrokerText}
+                    onChange={(e) => setDraft({ ...draft, buyerBrokerText: e.target.value })}
+                    className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
+                  />
+                </Field>
+                <Field label="Contact CTA text">
+                  <input
+                    value={draft.contactCtaText}
+                    onChange={(e) => setDraft({ ...draft, contactCtaText: e.target.value })}
                     className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm"
                   />
                 </Field>

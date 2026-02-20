@@ -5,7 +5,6 @@ import { formatAddressLine, formatOpenHouse } from "@/lib/format";
 import { HeroKenBurns } from "@/components/hero-kenburns";
 import { StickyNav, type StickyNavItem } from "@/components/sticky-nav";
 import { Section } from "@/components/section";
-import { ExpandableText } from "@/components/expandable-text";
 import { Gallery } from "@/components/gallery";
 import { VideoEmbed } from "@/components/video-embed";
 import { InquiryForm } from "@/components/inquiry-form";
@@ -38,6 +37,11 @@ export default async function PropertyPage({
   if (!property) notFound();
 
   const addressLine = formatAddressLine(property.address);
+  const openHouseCtaText =
+    property.openHouseCtaText || "Visit us at our upcoming Open House!";
+  const contactCtaText =
+    property.contactCtaText ||
+    "For more information, call/text Carolyn or John at 216-505-7557, or leave a message below.";
 
   const photos = property.media?.photos ?? [];
   const heroImages =
@@ -84,8 +88,7 @@ export default async function PropertyPage({
           <section id="overview" className="py-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white">Overview</h2>
-                <p className="mt-1 text-sm text-white/85">
+                <p className="text-sm text-white/85">
                   {property.headline ?? "Key details, story, and open house info."}
                 </p>
               </div>
@@ -94,7 +97,7 @@ export default async function PropertyPage({
               <div className="lg:col-span-8">
                 <h3 className="text-base font-semibold text-white">Description</h3>
                 <div className="mt-3">
-                  <ExpandableText text={property.description} tone="light" />
+                  <p className="whitespace-pre-line text-white/90">{property.description}</p>
                 </div>
               </div>
 
@@ -105,7 +108,7 @@ export default async function PropertyPage({
                       Open House
                     </p>
                     <h3 className="mt-3 text-xl font-semibold leading-tight text-[#ffed14]">
-                      Visit us at our upcoming Open House!
+                      {openHouseCtaText}
                     </h3>
                     <ul className="mt-4 grid gap-3 text-sm text-white/95">
                       {property.openHouses.map((oh) => (
@@ -181,7 +184,7 @@ export default async function PropertyPage({
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
                 <p className="mt-1 text-sm text-white/85">
-                  <b>For more information, call/text Carolyn or John at 216-505-7557, or leave a message below.</b>
+                  <b>{contactCtaText}</b>
                 </p>
               </div>
             </div>
@@ -306,8 +309,7 @@ export default async function PropertyPage({
 
       <footer className="border-t border-ink-100">
         <div className="container-page py-10 text-sm text-ink-600">
-          <p>© {new Date().getFullYear()} outjet productions</p>
-          <p className="mt-2">
+          <p>
             <a className="font-medium text-ink-700 hover:text-ink-900" href="/owner">
               Owner login
             </a>

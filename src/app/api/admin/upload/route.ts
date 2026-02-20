@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import {
   adminAuth,
   adminBucket,
@@ -107,6 +109,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Invalid payload" }, { status: 400 });
     }
 
+    const maxUploadBytes = 25 * 1024 * 1024;
+    if (file.size > maxUploadBytes) {
+      return NextResponse.json(
+        { ok: false, error: "File too large. Max upload size is 25MB." },
+        { status: 413 }
+      );
+    }
+
+    if (folder === "docs" && file.type && file.type !== "application/pdf") {
+      return NextResponse.json(
+        { ok: false, error: "Documents folder accepts PDF files only." },
+        { status: 400 }
+      );
+    }
+
     const filename = safeName(file.name || "upload.bin");
     if (!filename) {
       return NextResponse.json({ ok: false, error: "Invalid filename" }, { status: 400 });
@@ -114,15 +131,16 @@ export async function POST(req: Request) {
 
     const objectPath = `listings/${slug}/${folder}/${filename}`;
     const contentType = file.type || "application/octet-stream";
-    const bytes = Buffer.from(await file.arrayBuffer());
-
-    await adminBucket().file(objectPath).save(bytes, {
+    const storageFile = adminBucket().file(objectPath);
+    const writeStream = storageFile.createWriteStream({
       resumable: false,
       contentType,
       metadata: {
         contentType
       }
     });
+    const readStream = Readable.fromWeb(file.stream() as ReadableStream<any>);
+    await pipeline(readStream, writeStream);
 
     return NextResponse.json({ ok: true, objectPath });
   } catch (e) {

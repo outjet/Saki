@@ -136,7 +136,7 @@ export function DetailsBar({ property }: { property: Property }) {
             {formatMoney(property.price)}
           </div>
           <div className="mt-1 text-xs text-white/60">
-            Buyer broker commission negotiable
+            {property.buyerBrokerText || "Buyer broker commission negotiable"}
           </div>
         </div>
 

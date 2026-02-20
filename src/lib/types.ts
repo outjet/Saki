@@ -62,6 +62,9 @@ export type Property = {
   features?: string[];
   agent?: PropertyAgent;
   openHouses?: OpenHouse[];
+  openHouseCtaText?: string;
+  buyerBrokerText?: string;
+  contactCtaText?: string;
   location?: PropertyLocation;
   media?: PropertyMedia;
 };
