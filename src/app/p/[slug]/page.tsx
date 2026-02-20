@@ -52,8 +52,6 @@ export default async function PropertyPage({
   const overviewBackdrop =
     property.media?.overviewBackdrop ||
     property.media?.backgrounds?.[0] ||
-    photos.find((src) => /DJI_0868\.png/i.test(src)) ||
-    heroImages.find((src) => /DJI_0868\.png/i.test(src)) ||
     photos[0] ||
     heroImages[0] ||
     "/placeholders/hero.svg";
