@@ -175,7 +175,7 @@ export default async function PropertyPage({
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
                 <p className="mt-1 text-sm text-white/85">
-                  <b>For more information, call/text Carolyn at 216-505-7557, or leave a message below.</b>
+                  <b>For more information, call/text Carolyn or John at 216-505-7557, or leave a message below.</b>
                 </p>
               </div>
             </div>
