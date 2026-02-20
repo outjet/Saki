@@ -7,7 +7,7 @@ import { StickyNav, type StickyNavItem } from "@/components/sticky-nav";
 import { Section } from "@/components/section";
 import { Gallery } from "@/components/gallery";
 import { VideoEmbed } from "@/components/video-embed";
-import { InquiryForm } from "@/components/inquiry-form";
+import { ContactOverlay } from "@/components/contact-overlay";
 import { GoogleMap } from "@/components/google-map";
 import { DetailsBar } from "@/components/details-bar";
 
@@ -163,38 +163,11 @@ export default async function PropertyPage({
         </Section>
       ) : null}
 
-      <section id="contact" className="relative py-10 sm:py-12">
-        {contactVideo ? (
-          <video
-            className="absolute inset-0 h-full w-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-          >
-            <source src={contactVideo} />
-          </video>
-        ) : null}
-        <div className="relative container-page">
-          <div className="rounded-3xl border border-white/20 bg-slate-700/35 p-6 sm:p-8">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white">Contact</h2>
-                <p className="mt-1 text-sm text-white/85">
-                  <b>{contactCtaText}</b>
-                </p>
-              </div>
-            </div>
-            <div className="mt-6">
-              <div className="mx-auto max-w-3xl">
-                <InquiryForm propertySlug={property.slug} tone="dark" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ContactOverlay
+        propertySlug={property.slug}
+        contactCtaText={contactCtaText}
+        contactVideo={contactVideo}
+      />
 
       {property.location ? (
         <section id="map" className="py-10 sm:py-12">
