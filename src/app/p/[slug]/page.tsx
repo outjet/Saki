@@ -60,9 +60,6 @@ export default async function PropertyPage({
 
   const nav: StickyNavItem[] = [
     { id: "overview", label: "Overview" },
-    ...(property.features && property.features.length > 0
-      ? [{ id: "features", label: "Features" }]
-      : []),
     ...(photos.length > 0 ? [{ id: "photos", label: "Photos" }] : []),
     ...(hasVideo ? [{ id: "video", label: "Video" }] : []),
     ...(tours.length > 0 ? [{ id: "tours", label: "Tours" }] : []),
