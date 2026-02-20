@@ -139,7 +139,9 @@ export async function POST(req: Request) {
         contentType
       }
     });
-    const readStream = Readable.fromWeb(file.stream() as ReadableStream<any>);
+    const readStream = Readable.fromWeb(
+      file.stream() as unknown as import("node:stream/web").ReadableStream
+    );
     await pipeline(readStream, writeStream);
 
     return NextResponse.json({ ok: true, objectPath });
