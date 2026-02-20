@@ -135,6 +135,9 @@ export function DetailsBar({ property }: { property: Property }) {
           <div className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             {formatMoney(property.price)}
           </div>
+          <div className="mt-1 text-xs text-white/60">
+            Buyer broker commission negotiable
+          </div>
         </div>
 
         <div className="flex w-full flex-wrap justify-center lg:w-auto lg:flex-nowrap lg:justify-end">
