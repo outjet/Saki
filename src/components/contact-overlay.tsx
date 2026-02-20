@@ -3,13 +3,6 @@
 import { useState } from "react";
 import { InquiryForm } from "@/components/inquiry-form";
 
-declare global {
-  interface Window {
-    dataLayer?: unknown[];
-    gtag?: (...args: unknown[]) => void;
-  }
-}
-
 export function ContactOverlay({
   propertySlug,
   contactCtaText,
