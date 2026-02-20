@@ -88,14 +88,13 @@ export default async function PropertyPage({
           <section id="overview" className="py-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="text-sm text-white/85">
+                <p className="text-base font-semibold text-white/85">
                   {property.headline ?? "Key details, story, and open house info."}
                 </p>
               </div>
             </div>
             <div className="mt-6 grid gap-8 lg:grid-cols-12">
               <div className="lg:col-span-8">
-                <h3 className="text-base font-semibold text-white">Description</h3>
                 <div className="mt-3">
                   <p className="whitespace-pre-line text-white/90">{property.description}</p>
                 </div>
