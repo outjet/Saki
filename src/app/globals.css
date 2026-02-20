@@ -52,7 +52,7 @@ body {
 /* Ken Burns hero slideshow */
 @keyframes heroFade {
   0% {
-    opacity: 0;
+    opacity: 1;
   }
   6% {
     opacity: 1;

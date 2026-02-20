@@ -25,6 +25,8 @@ export function HeroKenBurns({
               alt={idx === 0 ? title : ""}
               fill
               priority={idx === 0}
+              fetchPriority={idx === 0 ? "high" : "auto"}
+              quality={75}
               className="hero-kenburns object-cover"
               sizes="100vw"
             />
