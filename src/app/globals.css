@@ -71,10 +71,12 @@ body {
 .hero-slide {
   opacity: 0;
   animation: heroFade 32s infinite;
+  will-change: opacity;
 }
 
 .hero-kenburns {
   animation: kbZoom 14s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 @keyframes kbZoom {

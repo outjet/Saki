@@ -9,6 +9,12 @@ Modern single-property / portfolio listing site built with Next.js + Tailwind an
 3. Open: http://localhost:3000
 4. Owner panel: http://localhost:3000/owner
 
+## Runtime behavior
+
+- Home route (`/`) renders a dedicated listing slug (`23760-emmons-road`).
+- Slug routes are available at `/p/<slug>`.
+- Middleware strips common tracking query params (`fbclid`, `gclid`, `utm_*`, etc.) and redirects to a clean URL (HTTP 308).
+
 ## Deploy
 
 This app uses Next.js server routes (for `/owner` and admin APIs), so it must be deployed with **Firebase App Hosting** (or another server runtime). Firebase Hosting (static `out/`) is not used for SSR.
@@ -48,6 +54,9 @@ Set:
 To render the full-width Google Map section, set:
 
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `.env.local`
+- Optional: `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` for Cloud Map Styling
+
+Map JS is lazy-loaded when the map section approaches the viewport.
 
 ## Analytics
 
@@ -77,7 +86,15 @@ Client (public):
 Server (private):
 
 - `OWNER_EMAIL_ALLOWLIST` (comma-separated emails that can manage `/owner`)
-- Local dev: set `GOOGLE_APPLICATION_CREDENTIALS` to a downloaded service account key JSON file, **or** set `FIREBASE_SERVICE_ACCOUNT` to the JSON string.
+- `FIREBASE_STORAGE_BUCKET` (optional override; otherwise inferred from public config)
+- Local dev auth: set `GOOGLE_APPLICATION_CREDENTIALS` to a downloaded service account key JSON file, **or** set `FIREBASE_SERVICE_ACCOUNT` / `FIREBASE_ADMIN_SDK_JSON` to the JSON string.
+
+## Push local content to Firestore
+
+Use the helper script to upsert local listing JSON (`content/properties/<slug>/property.json`) into Firestore:
+
+- `npm run push:property -- <slug>`
+- Example: `npm run push:property -- 23760-emmons-road`
 
 ### Data storage
 

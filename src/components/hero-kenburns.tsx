@@ -16,7 +16,7 @@ export function HeroKenBurns({
           <div
             // eslint-disable-next-line react/no-array-index-key
             key={`${src}-${idx}`}
-            className="hero-slide absolute inset-0"
+            className="hero-slide absolute inset-0 pointer-events-none"
             style={{ animationDelay: `${idx * 8}s` }}
             aria-hidden={idx === 0 ? undefined : true}
           >
@@ -30,9 +30,12 @@ export function HeroKenBurns({
               className="hero-kenburns object-cover"
               sizes="100vw"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
           </div>
         ))}
+        <div
+          className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/55 via-black/10 to-transparent"
+          aria-hidden="true"
+        />
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0">
         <div className="container-page pb-10">
