@@ -80,10 +80,10 @@ export function ContactOverlay({
 
         <div
           id={`contact-panel-${propertySlug}`}
-          className={`overflow-hidden transition-all duration-500 ease-out ${
+          className={`overflow-hidden transition-[opacity,transform,margin] duration-500 ease-out ${
             isCollapsed
-              ? "mt-0 max-h-0 -translate-y-4 opacity-0"
-              : "mt-4 max-h-[1000px] translate-y-0 opacity-100"
+              ? "pointer-events-none mt-0 -translate-y-4 opacity-0"
+              : "mt-4 translate-y-0 opacity-100"
           }`}
           aria-hidden={isCollapsed}
         >

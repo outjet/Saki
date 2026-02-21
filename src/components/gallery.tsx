@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -20,6 +20,7 @@ export function Gallery({
 }) {
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
+  const preloadedRef = useRef<Set<string>>(new Set());
 
   const gridCols =
     columns === 2
@@ -47,6 +48,22 @@ export function Gallery({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, canPrev, canNext]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (typeof window === "undefined") return;
+
+    const candidates = [images[index - 1], images[index + 1]].filter(
+      (src): src is string => Boolean(src)
+    );
+    for (const src of candidates) {
+      if (preloadedRef.current.has(src)) continue;
+      const img = new window.Image();
+      img.decoding = "async";
+      img.src = src;
+      preloadedRef.current.add(src);
+    }
+  }, [open, index, images]);
 
   if (images.length === 0) return null;
 
@@ -105,7 +122,6 @@ export function Gallery({
                 fill
                 className="object-contain"
                 sizes="100vw"
-                priority
               />
             </div>
 
@@ -133,4 +149,3 @@ export function Gallery({
     </>
   );
 }
-

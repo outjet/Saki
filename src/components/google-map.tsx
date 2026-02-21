@@ -29,15 +29,45 @@ export function GoogleMap({
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   const [ready, setReady] = useState(false);
+  const [shouldLoadMapScript, setShouldLoadMapScript] = useState(false);
   const [scrollZoom, setScrollZoom] = useState(false);
 
   const mapRef = useRef<any>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const src = useMemo(() => {
     if (!key) return null;
     const params = new URLSearchParams({ v: "3", key });
     return `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
   }, [key]);
+
+  useEffect(() => {
+    if (shouldLoadMapScript) return;
+    const target = wrapperRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          setShouldLoadMapScript(true);
+          observer.disconnect();
+          break;
+        }
+      },
+      { rootMargin: "300px 0px", threshold: 0.01 }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [shouldLoadMapScript]);
+
+  useEffect(() => {
+    if (!shouldLoadMapScript) return;
+    if (typeof window === "undefined") return;
+    const g = (window as any).google;
+    if (g?.maps) setReady(true);
+  }, [shouldLoadMapScript]);
 
   // Create map once
   useEffect(() => {
@@ -125,10 +155,13 @@ export function GoogleMap({
 
   return (
     <>
-      <Script src={src} strategy="afterInteractive" onLoad={() => setReady(true)} />
+      {shouldLoadMapScript ? (
+        <Script src={src} strategy="lazyOnload" onLoad={() => setReady(true)} />
+      ) : null}
 
       {/* Wrapper captures "intent" without an overlay */}
       <div
+        ref={wrapperRef}
         style={{ width: "100%", height: `${heightPx}px`, position: "relative", overflow: "hidden" }}
         onPointerDown={() => setScrollZoom(true)}   // click/tap means "I mean it"
         onMouseLeave={() => setScrollZoom(false)}   // leaving restores safe scroll
