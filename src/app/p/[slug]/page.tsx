@@ -10,6 +10,7 @@ import { VideoEmbed } from "@/components/video-embed";
 import { ContactOverlay } from "@/components/contact-overlay";
 import { GoogleMap } from "@/components/google-map";
 import { DetailsBar } from "@/components/details-bar";
+import { CompsTable } from "@/components/comps-table";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function PropertyPage({
   const hasMap = Boolean(property.location);
   const hasGoogleKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
   const contactVideo = property.media?.contactVideo || property.media?.contactVideos?.[0];
+  const comps = property.comps ?? [];
   const overviewBackdrop =
     property.media?.overviewBackdrop ||
     property.media?.backgrounds?.[0] ||
@@ -68,6 +70,7 @@ export default async function PropertyPage({
     ...(floorplans.length > 0 ? [{ id: "floorplans", label: "Floor plans" }] : []),
     ...(documents.length > 0 ? [{ id: "documents", label: "Documents" }] : []),
     { id: "contact", label: "Contact" },
+    ...(comps.length > 0 ? [{ id: "comps", label: "Comps" }] : []),
     ...(hasMap ? [{ id: "map", label: "Map" }] : [])
   ];
 
@@ -168,6 +171,12 @@ export default async function PropertyPage({
         contactCtaText={contactCtaText}
         contactVideo={contactVideo}
       />
+
+      {comps.length > 0 ? (
+        <Section id="comps" title="Comparable Sales">
+          <CompsTable comps={comps} />
+        </Section>
+      ) : null}
 
       {property.location ? (
         <section id="map" className="py-10 sm:py-12">

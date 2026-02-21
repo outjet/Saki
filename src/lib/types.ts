@@ -49,6 +49,14 @@ export type PropertyMedia = {
   tours?: { label: string; href: string }[];
 };
 
+export type PropertyComp = {
+  address: string;
+  bedsBaths: string;
+  lotSize: string;
+  saleDate: string;
+  salePrice: string;
+};
+
 export type Property = {
   slug: string;
   address: PropertyAddress;
@@ -60,6 +68,7 @@ export type Property = {
   headline?: string;
   description: string;
   features?: string[];
+  comps?: PropertyComp[];
   agent?: PropertyAgent;
   openHouses?: OpenHouse[];
   openHouseCtaText?: string;
