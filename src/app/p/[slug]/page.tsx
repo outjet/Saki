@@ -11,6 +11,96 @@ import { ContactOverlay } from "@/components/contact-overlay";
 import { GoogleMap } from "@/components/google-map";
 import { DetailsBar } from "@/components/details-bar";
 import { CompsTable } from "@/components/comps-table";
+import type { PropertyComp } from "@/lib/types";
+
+const FALLBACK_COMPS_BY_SLUG: Record<string, PropertyComp[]> = {
+  "23760-emmons-road": [
+    {
+      address: "23312 Emmons Rd.",
+      bedsBaths: "4 Bed",
+      lotSize: "3.3 Acres",
+      saleDate: "10/02/2025",
+      salePrice: "$660,000"
+    },
+    {
+      address: "19322 East River Rd.",
+      bedsBaths: "4 Bed",
+      lotSize: "8 Acres",
+      saleDate: "01/05/2025",
+      salePrice: "$625,000"
+    },
+    {
+      address: "23678 Wallys Way",
+      bedsBaths: "4 Bed / 3 Bath",
+      lotSize: "0.24 Acres",
+      saleDate: "08/21/2025",
+      salePrice: "$611,575"
+    },
+    {
+      address: "23671 Wallys Way",
+      bedsBaths: "4 Bed / 3 Bath",
+      lotSize: "0.30 Acres",
+      saleDate: "05/15/2025",
+      salePrice: "$623,109"
+    },
+    {
+      address: "23685 Wallys Way",
+      bedsBaths: "—",
+      lotSize: "0.35 Acres",
+      saleDate: "06/06/2025",
+      salePrice: "$696,430"
+    },
+    {
+      address: "24848 River Glen Dr",
+      bedsBaths: "4 Bed / 3.5 Bath",
+      lotSize: "1 Acre",
+      saleDate: "11/24/2025",
+      salePrice: "$780,000"
+    },
+    {
+      address: "23926 West Rim Dr",
+      bedsBaths: "4 Bed / 3.5 Bath",
+      lotSize: "1.6 Acres",
+      saleDate: "12/09/2025",
+      salePrice: "$630,000"
+    },
+    {
+      address: "33840 Willow Creek Ct",
+      bedsBaths: "3 Bed / 3 Bath",
+      lotSize: "2 Acres",
+      saleDate: "11/24/2025",
+      salePrice: "$635,100"
+    },
+    {
+      address: "27385 Capel Rd",
+      bedsBaths: "4 Bed / 2.5 Bath",
+      lotSize: "10 Acres",
+      saleDate: "10/03/2025",
+      salePrice: "$755,000"
+    },
+    {
+      address: "1074 Greenhouse Trail",
+      bedsBaths: "2 Bed / 2 Bath",
+      lotSize: "0.19 Acres",
+      saleDate: "10/06/2025",
+      salePrice: "$647,287"
+    },
+    {
+      address: "10261 Baker Creek Lane",
+      bedsBaths: "3 Bed / 4 Bath",
+      lotSize: "0.36 Acres",
+      saleDate: "08/29/2025",
+      salePrice: "$650,000"
+    },
+    {
+      address: "12740 Root Rd",
+      bedsBaths: "3 Bed / 2.5 Bath",
+      lotSize: "7.2 Acres",
+      saleDate: "05/02/2025",
+      salePrice: "$705,000"
+    }
+  ]
+};
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +144,8 @@ export default async function PropertyPage({
   const hasMap = Boolean(property.location);
   const hasGoogleKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
   const contactVideo = property.media?.contactVideo || property.media?.contactVideos?.[0];
-  const comps = property.comps ?? [];
+  const fallbackComps = FALLBACK_COMPS_BY_SLUG[property.slug] ?? [];
+  const comps = property.comps && property.comps.length > 0 ? property.comps : fallbackComps;
   const overviewBackdrop =
     property.media?.overviewBackdrop ||
     property.media?.backgrounds?.[0] ||
